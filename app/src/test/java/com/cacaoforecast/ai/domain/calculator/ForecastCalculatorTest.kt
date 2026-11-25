@@ -102,4 +102,61 @@ class ForecastCalculatorTest {
             areaHa = 1.0
         )
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejeita NPF acima do limite 500`() {
+        ForecastCalculator.calculate(
+            nfs = 10,
+            nfd = 2,
+            npf = 501,
+            npt = 1000,
+            fa = 250.0,
+            areaHa = 1.0
+        )
+    }
+
+    @Test
+    fun `aceita limites de NPF 1 e 500`() {
+        val minNpf = ForecastCalculator.calculate(nfs = 5, nfd = 0, npf = 1, npt = 100, fa = 250.0, areaHa = 1.0)
+        val maxNpf = ForecastCalculator.calculate(nfs = 500, nfd = 0, npf = 500, npt = 1000, fa = 250.0, areaHa = 1.0)
+
+        assertEquals(2.0, minNpf.producaoBrutaArrobas, 1e-6)
+        assertEquals(4.0, maxNpf.producaoBrutaArrobas, 1e-6)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejeita NPT menor ou igual a zero`() {
+        ForecastCalculator.calculate(nfs = 10, nfd = 1, npf = 20, npt = 0, fa = 250.0, areaHa = 1.0)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejeita NFS negativo`() {
+        ForecastCalculator.calculate(nfs = -1, nfd = 0, npf = 20, npt = 1000, fa = 250.0, areaHa = 1.0)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejeita NFD negativo`() {
+        ForecastCalculator.calculate(nfs = 10, nfd = -1, npf = 20, npt = 1000, fa = 250.0, areaHa = 1.0)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejeita FA NaN ou Infinito`() {
+        ForecastCalculator.calculate(nfs = 10, nfd = 1, npf = 20, npt = 1000, fa = Double.NaN, areaHa = 1.0)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejeita areaHa Infinito`() {
+        ForecastCalculator.calculate(nfs = 10, nfd = 1, npf = 20, npt = 1000, fa = 250.0, areaHa = Double.POSITIVE_INFINITY)
+    }
+
+    @Test
+    fun `resolve doenca predominante para todas as classes e desempate deterministico`() {
+        assertEquals(DominantDisease.NONE, ForecastCalculator.resolveDominantDisease(0, 0, 0))
+        assertEquals(DominantDisease.PODRIDAO_PARDA, ForecastCalculator.resolveDominantDisease(8, 2, 3))
+        assertEquals(DominantDisease.MONILIASE, ForecastCalculator.resolveDominantDisease(2, 8, 3))
+        assertEquals(DominantDisease.VASSOURA_BRUXA, ForecastCalculator.resolveDominantDisease(2, 3, 8))
+        // Desempate deterministico prioriza Moniliase > Vassoura > Podridao
+        assertEquals(DominantDisease.MONILIASE, ForecastCalculator.resolveDominantDisease(5, 5, 5))
+        assertEquals(DominantDisease.VASSOURA_BRUXA, ForecastCalculator.resolveDominantDisease(5, 0, 5))
+    }
 }

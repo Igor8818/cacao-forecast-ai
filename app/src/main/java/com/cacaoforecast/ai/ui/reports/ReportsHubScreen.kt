@@ -37,6 +37,7 @@ fun ReportsHubScreen(
     val plots by viewModel.plotsForSelectedFarm.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
     val report by viewModel.report.collectAsStateWithLifecycle()
+    val cumulativeReport by viewModel.cumulativeReport.collectAsStateWithLifecycle()
     val isGeneratingPdf by viewModel.isGeneratingPdf.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -115,8 +116,11 @@ fun ReportsHubScreen(
                     selectedFarmId = filters.selectedFarmId ?: farms.firstOrNull()?.id,
                     plots = plots,
                     selectedPlotId = filters.cumulativePlotId ?: plots.firstOrNull()?.id,
+                    basis = filters.basis,
+                    cumulativeReport = cumulativeReport,
                     onSelectFarm = { viewModel.selectFarm(it) },
                     onSelectPlot = { viewModel.selectCumulativePlot(it) },
+                    onSelectBasis = { viewModel.selectBasis(it) },
                     onOpenPlotHistory = onOpenPlotHistory
                 )
             }

@@ -53,6 +53,7 @@ interface CacaoRepository {
         endMillis: Long,
         selectedPlotId: Long?,
         basis: ProductionBasis,
-        sortOrder: ReportSortOrder
+        sortOrder: ReportSortOrder,
+        periodLabel: String? = null
     ): Flow<FarmReportUiModel>
 }

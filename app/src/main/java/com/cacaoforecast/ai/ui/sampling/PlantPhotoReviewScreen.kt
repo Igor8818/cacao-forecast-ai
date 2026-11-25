@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -183,6 +185,34 @@ fun PlantPhotoReviewScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ReviewLegendItem(BoxHealthyColor, "Sadio")
+                        ReviewLegendItem(BoxPodridaoColor, "P. Parda")
+                        ReviewLegendItem(BoxMoniliaseColor, "Monil.")
+                        ReviewLegendItem(BoxVassouraColor, "Vassoura")
+                    }
+                    if (uiState.inferenceTimeMs > 0L) {
+                        Text(
+                            text = "${uiState.inferenceTimeMs} ms",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (uiState.reviewNfd > 0) {
+                    Text(
+                        text = "Doenças: Podridão ${uiState.reviewPodridao} • Monilíase ${uiState.reviewMoniliase} • Vassoura ${uiState.reviewVassoura}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (uiState.reviewMoniliase > 0) BoxMoniliaseColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (uiState.reviewMoniliase > 0) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+
                 uiState.errorMessage?.let { err ->
                     Text(err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -214,7 +244,10 @@ fun PlantPhotoReviewScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedButton(
-                        onClick = onRetake,
+                        onClick = {
+                            viewModel.clearCurrentPhotoReview()
+                            onRetake()
+                        },
                         enabled = !uiState.isAnalyzingPhoto && !uiState.isSavingPlant,
                         modifier = Modifier.weight(1f).height(56.dp)
                     ) {
@@ -238,7 +271,7 @@ fun PlantPhotoReviewScreen(
                             text = if (isLastPlant) {
                                 "Concluir ($plantIndex/$targetNpf) ✓"
                             } else {
-                                "Confirmar e Próxima ($plantIndex/$targetNpf)"
+                                "Próxima ($plantIndex/$targetNpf)"
                             },
                             maxLines = 1
                         )
@@ -246,6 +279,19 @@ fun PlantPhotoReviewScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReviewLegendItem(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color, CircleShape)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
 

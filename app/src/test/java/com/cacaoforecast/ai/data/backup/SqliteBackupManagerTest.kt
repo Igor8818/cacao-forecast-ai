@@ -1,6 +1,7 @@
 package com.cacaoforecast.ai.data.backup
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.cacaoforecast.ai.data.local.CacaoDatabase
@@ -85,5 +86,37 @@ class SqliteBackupManagerTest {
         val restoredFarms = repository.observeActiveFarms().first()
         assertEquals(1, restoredFarms.size)
         assertEquals("Fazenda Original Backup", restoredFarms.single().nome)
+    }
+
+    @Test
+    fun `exportToShareableFile gera db valido e importacao rejeita sqlite sem tabelas do app`() = runBlocking {
+        repository.saveFarm(Farm(nome = "Fazenda Share")).getOrThrow()
+
+        val shareRes = backupManager.exportToShareableFile()
+        assertTrue(shareRes.isSuccess)
+        val shareFile = shareRes.getOrThrow()
+        try {
+            assertTrue(shareFile.exists() && shareFile.length() > 100L)
+            assertEquals("backups", shareFile.parentFile?.name)
+            val header = shareFile.inputStream().use { it.readNBytes(16) }
+            assertEquals("SQLite format 3\u0000", String(header, Charsets.US_ASCII))
+        } finally {
+            shareFile.delete()
+        }
+
+        // Banco SQLite integro, porem sem as tabelas obrigatorias do CacaoForecastAI
+        val foreignDbFile = File(context.cacheDir, "foreign_sqlite.db").apply { delete() }
+        try {
+            val foreignDb = SQLiteDatabase.openOrCreateDatabase(foreignDbFile, null)
+            foreignDb.execSQL("CREATE TABLE outra_tabela (id INTEGER PRIMARY KEY)")
+            foreignDb.version = 1
+            foreignDb.close()
+
+            val rejected = backupManager.importFromUri(Uri.fromFile(foreignDbFile))
+            assertTrue(rejected.isFailure)
+            assertEquals(1, repository.observeActiveFarms().first().size)
+        } finally {
+            foreignDbFile.delete()
+        }
     }
 }

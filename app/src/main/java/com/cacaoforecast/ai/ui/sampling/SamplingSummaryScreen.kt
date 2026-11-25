@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import java.util.Locale
 
@@ -140,6 +142,37 @@ fun SamplingSummaryScreen(
                         Text("• Podridão Parda: ${summary.nPodridao}")
                         Text("• Monilíase: ${summary.nMoniliase}")
                         Text("• Vassoura de Bruxa: ${summary.nVassoura}")
+                    }
+                }
+
+                if (summary.nMoniliase > 0) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = BoxMoniliaseColor.copy(alpha = 0.12f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = BoxMoniliaseColor
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "ALERTA QUARENTENÁRIO: Monilíase detectada (${summary.nMoniliase} fruto(s))",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BoxMoniliaseColor
+                                )
+                                Text(
+                                    text = "Isole a área amostrada e comunique a assistência técnica CEPLAC para vistoria imediata.",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
                     }
                 }
 

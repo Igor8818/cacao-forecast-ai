@@ -25,7 +25,8 @@ data class PlotReportRowUiModel(
     val producaoLiquidaArrobas: Double,
     val perdasPct: Double,
     val severity: DiseaseSeverity,
-    val dominantDisease: DominantDisease
+    val dominantDisease: DominantDisease,
+    val nMoniliase: Int = 0
 )
 
 data class FarmConsolidatedFooterUiModel(
@@ -38,7 +39,9 @@ data class FarmConsolidatedFooterUiModel(
     val produtividadeConsolidadaPorHa: Double,
     val totalPerdaArrobas: Double,
     val perdasPonderadasPct: Double,
-    val severity: DiseaseSeverity
+    val severity: DiseaseSeverity,
+    val totalMoniliaseFruits: Int = 0,
+    val moniliaseAlertPlotNames: List<String> = emptyList()
 )
 
 data class FarmReportUiModel(
@@ -52,4 +55,25 @@ data class FarmReportUiModel(
     val criticalHighlightRow: PlotReportRowUiModel?,
     val rows: List<PlotReportRowUiModel>,
     val footer: FarmConsolidatedFooterUiModel
+)
+
+data class CumulativeEvaluationPoint(
+    val evaluationId: Long,
+    val dataMillis: Long,
+    val estimadaArrobas: Double,
+    val realArrobas: Double?,
+    val perdasPct: Double,
+    val deltaPerdasPctVsAnterior: Double?,
+    val nMoniliase: Int
+)
+
+data class CumulativePlotReport(
+    val plotId: Long?,
+    val basis: ProductionBasis,
+    val points: List<CumulativeEvaluationPoint>,
+    val totalEstimadaArrobas: Double,
+    val totalRealArrobas: Double,
+    val evaluationsWithRealCount: Int,
+    val meanRelativeErrorPct: Double?,
+    val latestLossDeltaPct: Double?
 )

@@ -117,7 +117,8 @@ class PdfReportGenerator(private val context: Context) {
 
         val ptBr = Locale("pt", "BR")
         val hasAlert = report.criticalHighlightRow != null
-        val firstPageTableTop = if (hasAlert) 210f else 156f
+        val hasMoniliaseAlert = report.footer.totalMoniliaseFruits > 0
+        val firstPageTableTop = 156f + (if (hasAlert) 54f else 0f) + (if (hasMoniliaseAlert) 46f else 0f)
         val nextPageTableTop = 78f
         val maxTableBottom = FOOTER_DISCLAIMER_Y - 26f
 
@@ -212,6 +213,26 @@ class PdfReportGenerator(private val context: Context) {
                             textPaint
                         )
                         y += 48f
+                    }
+
+                    if (hasMoniliaseAlert) {
+                        val moniliaseBgPaint = Paint().apply { color = Color.rgb(245, 229, 252) }
+                        val moniliaseTitlePaint = Paint(boldPaint).apply { color = Color.rgb(142, 0, 173) }
+                        canvas.drawRect(MARGIN_X, y, MARGIN_X + CONTENT_WIDTH, y + 38f, moniliaseBgPaint)
+                        canvas.drawText(
+                            "ALERTA QUARENTENÁRIO: Suspeita de Monilíase (${report.footer.totalMoniliaseFruits} fruto(s))",
+                            MARGIN_X + 8f,
+                            y + 14f,
+                            moniliaseTitlePaint
+                        )
+                        val affected = report.footer.moniliaseAlertPlotNames.joinToString(", ").take(56)
+                        canvas.drawText(
+                            "Roças afetadas: $affected — Isolar área e acionar assistência técnica CEPLAC.",
+                            MARGIN_X + 8f,
+                            y + 29f,
+                            textPaint
+                        )
+                        y += 44f
                     }
                 } else {
                     canvas.drawText("Fazenda: ${report.farm.nome} • ${report.periodLabel} (continuação)", MARGIN_X, y, boldPaint)
