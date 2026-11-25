@@ -102,6 +102,146 @@ class FarmReportConsolidatorTest {
         assertEquals(25.0, report.footer.perdasPonderadasPct, 1e-6)
     }
 
+    @Test
+    fun `suporta ordenacoes LOSS_DESC PRODUCTION_DESC e PLOT_NAME_ASC`() {
+        val farm = Farm(id = 1L, nome = "Fazenda Ordenação")
+        val plotZ = Plot(id = 1L, fazendaId = 1L, nome = "Zebra", areaHa = 2.0, npt = 1000, fa = 250.0)
+        val plotA = Plot(id = 2L, fazendaId = 1L, nome = "Alvorada", areaHa = 2.0, npt = 1000, fa = 250.0)
+        val plotM = Plot(id = 3L, fazendaId = 1L, nome = "Meio", areaHa = 2.0, npt = 1000, fa = 250.0)
+
+        val evals = listOf(
+            EvaluationWithPeriodCount(eval(1L, plotZ, 90, 10, bruta = 100.0, liquida = 90.0, perdasPct = 10.0, DominantDisease.PODRIDAO_PARDA), 1),
+            EvaluationWithPeriodCount(eval(2L, plotA, 50, 50, bruta = 80.0, liquida = 40.0, perdasPct = 50.0, DominantDisease.VASSOURA_BRUXA), 1),
+            EvaluationWithPeriodCount(eval(3L, plotM, 190, 10, bruta = 200.0, liquida = 190.0, perdasPct = 5.0, DominantDisease.MONILIASE), 1)
+        )
+
+        val byLoss = FarmReportConsolidator.buildReport(
+            farm, listOf(plotZ, plotA, plotM), evals, "Nov/2026", 0L, 1000L, null,
+            ProductionBasis.NET_HEALTHY_NFS, ReportSortOrder.LOSS_DESC
+        )
+        assertEquals(listOf("Alvorada", "Zebra", "Meio"), byLoss.rows.map { it.plotName })
+
+        val byProd = FarmReportConsolidator.buildReport(
+            farm, listOf(plotZ, plotA, plotM), evals, "Nov/2026", 0L, 1000L, null,
+            ProductionBasis.NET_HEALTHY_NFS, ReportSortOrder.PRODUCTION_DESC
+        )
+        assertEquals(listOf("Meio", "Zebra", "Alvorada"), byProd.rows.map { it.plotName })
+
+        val byName = FarmReportConsolidator.buildReport(
+            farm, listOf(plotZ, plotA, plotM), evals, "Nov/2026", 0L, 1000L, null,
+            ProductionBasis.NET_HEALTHY_NFS, ReportSortOrder.PLOT_NAME_ASC
+        )
+        assertEquals(listOf("Alvorada", "Meio", "Zebra"), byName.rows.map { it.plotName })
+    }
+
+    @Test
+    fun `filtro por quadra unica e exclusao de quadras arquivadas ajustam rodape corretamente`() {
+        val farm = Farm(id = 1L, nome = "Fazenda Filtro")
+        val plot1 = Plot(id = 1L, fazendaId = 1L, nome = "Roça 1", areaHa = 2.0, npt = 1000, fa = 250.0, ativo = true)
+        val plot2 = Plot(id = 2L, fazendaId = 1L, nome = "Roça 2", areaHa = 3.0, npt = 1500, fa = 250.0, ativo = true)
+        val archivedPlot = Plot(id = 3L, fazendaId = 1L, nome = "Roça Arquivada", areaHa = 5.0, npt = 2500, fa = 250.0, ativo = false)
+
+        val evals = listOf(
+            EvaluationWithPeriodCount(eval(1L, plot1, 90, 10, 100.0, 90.0, 10.0, DominantDisease.PODRIDAO_PARDA), 1),
+            EvaluationWithPeriodCount(eval(2L, plot2, 70, 30, 100.0, 70.0, 30.0, DominantDisease.VASSOURA_BRUXA), 1)
+        )
+
+        val singlePlotReport = FarmReportConsolidator.buildReport(
+            farm = farm,
+            allActivePlots = listOf(plot1, plot2, archivedPlot),
+            deduplicatedEvaluations = evals,
+            periodLabel = "Nov/2026",
+            startMillis = 0L,
+            endMillis = 1000L,
+            selectedPlotId = 1L,
+            basis = ProductionBasis.NET_HEALTHY_NFS,
+            sortOrder = ReportSortOrder.LOSS_DESC
+        )
+
+        assertEquals(1, singlePlotReport.rows.size)
+        assertEquals(1L, singlePlotReport.rows.single().plotId)
+        assertEquals(1, singlePlotReport.footer.totalPlotsEvaluated)
+        assertEquals(1, singlePlotReport.footer.totalActivePlotsInFarm)
+        assertEquals(emptyList<String>(), singlePlotReport.footer.pendingPlotNames)
+        assertEquals(2.0, singlePlotReport.footer.totalAreaHa, 1e-6)
+        assertEquals(1000, singlePlotReport.footer.totalNpt)
+        assertEquals(90.0, singlePlotReport.footer.totalProducaoExibidaArrobas, 1e-6)
+        assertEquals(10.0, singlePlotReport.footer.perdasPonderadasPct, 1e-6)
+
+        // Sem filtro de quadra, quadra arquivada nao entra nas pendentes
+        val allPlotsReport = FarmReportConsolidator.buildReport(
+            farm = farm,
+            allActivePlots = listOf(plot1, archivedPlot),
+            deduplicatedEvaluations = listOf(evals.first()),
+            periodLabel = "Nov/2026",
+            startMillis = 0L,
+            endMillis = 1000L,
+            selectedPlotId = null,
+            basis = ProductionBasis.NET_HEALTHY_NFS,
+            sortOrder = ReportSortOrder.LOSS_DESC
+        )
+        assertEquals(1, allPlotsReport.footer.totalActivePlotsInFarm)
+        assertEquals(emptyList<String>(), allPlotsReport.footer.pendingPlotNames)
+    }
+
+    @Test
+    fun `relatorio sem avaliacoes no periodo retorna zeros sem NaN e lista todas rocas ativas pendentes`() {
+        val farm = Farm(id = 1L, nome = "Fazenda Vazia")
+        val plotB = Plot(id = 2L, fazendaId = 1L, nome = "Roça B", areaHa = 2.0, npt = 1000, fa = 250.0)
+        val plotA = Plot(id = 1L, fazendaId = 1L, nome = "Roça A", areaHa = 3.0, npt = 1500, fa = 250.0)
+
+        val report = FarmReportConsolidator.buildReport(
+            farm = farm,
+            allActivePlots = listOf(plotB, plotA),
+            deduplicatedEvaluations = emptyList(),
+            periodLabel = "Nov/2026",
+            startMillis = 0L,
+            endMillis = 1000L,
+            selectedPlotId = null,
+            basis = ProductionBasis.NET_HEALTHY_NFS,
+            sortOrder = ReportSortOrder.LOSS_DESC
+        )
+
+        assertEquals(0, report.rows.size)
+        assertEquals(null, report.criticalHighlightRow)
+        assertEquals(listOf("Roça A", "Roça B"), report.footer.pendingPlotNames)
+        assertEquals(0.0, report.footer.totalAreaHa, 1e-9)
+        assertEquals(0.0, report.footer.produtividadeConsolidadaPorHa, 1e-9)
+        assertEquals(0.0, report.footer.perdasPonderadasPct, 1e-9)
+        assertEquals(DiseaseSeverity.CONTROLLED, report.footer.severity)
+        assertEquals(0, report.footer.totalMoniliaseFruits)
+        assertEquals(emptyList<String>(), report.footer.moniliaseAlertPlotNames)
+    }
+
+    @Test
+    fun `consolida alerta quarentenario de moniliase com total de frutos e rocas afetadas`() {
+        val farm = Farm(id = 1L, nome = "Fazenda Quarentena")
+        val plotA = Plot(id = 1L, fazendaId = 1L, nome = "Roça Baixa", areaHa = 2.0, npt = 1000, fa = 250.0)
+        val plotB = Plot(id = 2L, fazendaId = 1L, nome = "Roça Alta", areaHa = 3.0, npt = 1500, fa = 250.0)
+
+        val evalA = eval(1L, plotA, 95, 5, 100.0, 95.0, 5.0, DominantDisease.MONILIASE).copy(nMoniliase = 3)
+        val evalB = eval(2L, plotB, 90, 10, 100.0, 90.0, 10.0, DominantDisease.PODRIDAO_PARDA)
+
+        val report = FarmReportConsolidator.buildReport(
+            farm = farm,
+            allActivePlots = listOf(plotA, plotB),
+            deduplicatedEvaluations = listOf(
+                EvaluationWithPeriodCount(evalA, 1),
+                EvaluationWithPeriodCount(evalB, 1)
+            ),
+            periodLabel = "Nov/2026",
+            startMillis = 0L,
+            endMillis = 1000L,
+            selectedPlotId = null,
+            basis = ProductionBasis.NET_HEALTHY_NFS,
+            sortOrder = ReportSortOrder.LOSS_DESC
+        )
+
+        assertEquals(3, report.footer.totalMoniliaseFruits)
+        assertEquals(listOf("Roça Baixa"), report.footer.moniliaseAlertPlotNames)
+        assertEquals(3, report.rows.first { it.plotId == 1L }.nMoniliase)
+    }
+
     private fun eval(
         id: Long,
         plot: Plot,

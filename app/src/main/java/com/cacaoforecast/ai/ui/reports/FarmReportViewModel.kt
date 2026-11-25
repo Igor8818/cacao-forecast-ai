@@ -3,6 +3,8 @@ package com.cacaoforecast.ai.ui.reports
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.cacaoforecast.ai.domain.calculator.CumulativeStatsCalculator
+import com.cacaoforecast.ai.domain.model.CumulativePlotReport
 import com.cacaoforecast.ai.domain.model.Farm
 import com.cacaoforecast.ai.domain.model.FarmReportUiModel
 import com.cacaoforecast.ai.domain.model.Plot
@@ -43,20 +45,23 @@ class FarmReportViewModel(
     private val pdfReportGenerator: PdfReportGenerator
 ) : ViewModel() {
 
-    val farms: StateFlow<List<Farm>> = repository.observeActiveFarms()
+    private val activeFarmsSource = repository.observeActiveFarms()
+
+    val farms: StateFlow<List<Farm>> = activeFarmsSource
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _filters = MutableStateFlow(currentMonthFilter())
     val filters: StateFlow<ReportFilterState> = _filters.asStateFlow()
 
-    private val effectiveFarmId = combine(farms, _filters) { farmList, f ->
+    private val effectiveFarmId = combine(activeFarmsSource, _filters) { farmList, f ->
         f.selectedFarmId?.takeIf { id -> farmList.any { it.id == id } } ?: farmList.firstOrNull()?.id
     }
 
-    val plotsForSelectedFarm: StateFlow<List<Plot>> = effectiveFarmId
-        .flatMapLatest { farmId ->
-            if (farmId == null) flowOf(emptyList()) else repository.observeActivePlotsByFarm(farmId)
-        }
+    private val plotsSource = effectiveFarmId.flatMapLatest { farmId ->
+        if (farmId == null) flowOf(emptyList()) else repository.observeActivePlotsByFarm(farmId)
+    }
+
+    val plotsForSelectedFarm: StateFlow<List<Plot>> = plotsSource
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val report: StateFlow<FarmReportUiModel?> = combine(effectiveFarmId, _filters) { farmId, f ->
@@ -71,10 +76,30 @@ class FarmReportViewModel(
                 endMillis = f.endMillis,
                 selectedPlotId = f.selectedPlotId,
                 basis = f.basis,
-                sortOrder = f.sortOrder
+                sortOrder = f.sortOrder,
+                periodLabel = f.periodLabel
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val cumulativeReport: StateFlow<CumulativePlotReport> = combine(plotsSource, _filters) { plotList, f ->
+        val plotId = f.cumulativePlotId?.takeIf { id -> plotList.any { it.id == id } }
+            ?: plotList.firstOrNull()?.id
+        plotId to f.basis
+    }.flatMapLatest { (plotId, basis) ->
+        if (plotId == null) {
+            flowOf(CumulativeStatsCalculator.build(null, emptyList(), basis))
+        } else {
+            repository.observeCompletedEvaluationsByPlot(plotId)
+                .flatMapLatest { evals ->
+                    flowOf(CumulativeStatsCalculator.build(plotId, evals, basis))
+                }
+        }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        CumulativeStatsCalculator.build(null, emptyList(), ProductionBasis.NET_HEALTHY_NFS)
+    )
 
     private val _isGeneratingPdf = MutableStateFlow(false)
     val isGeneratingPdf: StateFlow<Boolean> = _isGeneratingPdf.asStateFlow()

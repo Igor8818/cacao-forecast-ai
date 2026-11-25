@@ -160,4 +160,114 @@ class SnapshotAndDeduplicationTest {
         assertEquals(72.0, report.footer.totalProducaoExibidaArrobas, 1e-6)
         assertEquals(EvaluationStatus.COMPLETED, repository.getEvaluationById(eval1.evaluationId)!!.status)
     }
+
+    @Test
+    fun `soft delete de quadra e fazenda oculta de listas ativas mas preserva avaliacoes historicas`() = runBlocking {
+        val farmId = repository.saveFarm(Farm(nome = "Fazenda Histórica")).getOrThrow()
+        val plotId = repository.savePlot(
+            Plot(fazendaId = farmId, nome = "Roça Antiga", areaHa = 2.0, npt = 1000, fa = 250.0, npf = 1)
+        ).getOrThrow()
+        val plot = repository.getPlotById(plotId)!!
+
+        val draft = repository.startNewSamplingSession(plot).getOrThrow()
+        repository.savePlantSample(draft.evaluationId, 1, nfs = 20, nfd = 5, 5, 0, 0, false, null).getOrThrow()
+        repository.finalizeSamplingSession(draft.evaluationId).getOrThrow()
+
+        // Arquiva quadra -> some de observeActivePlotsByFarm, mas historico permanece
+        repository.archivePlot(plotId).getOrThrow()
+        assertTrue(repository.observeActivePlotsByFarm(farmId).first().isEmpty())
+        val plotHistory = repository.observeCompletedEvaluationsByPlot(plotId).first()
+        assertEquals(1, plotHistory.size)
+        assertEquals(draft.evaluationId, plotHistory.single().id)
+
+        // Arquiva fazenda -> some de observeActiveFarms, mas avaliacao e relatorio permanecem acessiveis
+        repository.archiveFarm(farmId).getOrThrow()
+        assertTrue(repository.observeActiveFarms().first().isEmpty())
+        assertEquals(EvaluationStatus.COMPLETED, repository.getEvaluationById(draft.evaluationId)?.status)
+    }
+
+    @Test
+    fun `descartar sessao marca CANCELLED limpa temp paths e apaga arquivos temporarios`() = runBlocking {
+        val farmId = repository.saveFarm(Farm(nome = "Fazenda Descarte")).getOrThrow()
+        val plotId = repository.savePlot(
+            Plot(fazendaId = farmId, nome = "Roça Teste", areaHa = 1.0, npt = 500, fa = 250.0, npf = 3)
+        ).getOrThrow()
+        val plot = repository.getPlotById(plotId)!!
+
+        val draft = repository.startNewSamplingSession(plot).getOrThrow()
+        val sessionDir = File(tempSessionsRoot, "eval_${draft.evaluationId}").apply { mkdirs() }
+        val photoFile = File(sessionDir, "plant_1.jpg").apply { writeText("img") }
+        repository.savePlantSample(
+            evaluationId = draft.evaluationId,
+            plantIndex = 1,
+            nfs = 8,
+            nfd = 2,
+            nPodridao = 2,
+            nMoniliase = 0,
+            nVassoura = 0,
+            manualEdited = false,
+            tempPhotoPath = photoFile.absolutePath
+        ).getOrThrow()
+
+        repository.discardSamplingSession(draft.evaluationId).getOrThrow()
+
+        val cancelled = repository.getEvaluationById(draft.evaluationId)!!
+        assertEquals(EvaluationStatus.CANCELLED, cancelled.status)
+        assertEquals(null, repository.findInProgressSession(plotId))
+        assertEquals(null, repository.findAnyInProgressSession())
+        assertTrue(!sessionDir.exists())
+        val samples = db.evaluationDao().getSamplesByEvaluation(draft.evaluationId)
+        assertEquals(1, samples.size)
+        assertEquals(null, samples.single().fotoTempPath)
+    }
+
+    @Test
+    fun `iniciar nova sessao na mesma quadra cancela rascunho anterior e upsert nao duplica indice de planta`() = runBlocking {
+        val farmId = repository.saveFarm(Farm(nome = "Fazenda Upsert")).getOrThrow()
+        val plotId = repository.savePlot(
+            Plot(fazendaId = farmId, nome = "Roça Nova", areaHa = 2.0, npt = 1000, fa = 250.0, npf = 2)
+        ).getOrThrow()
+        val plot = repository.getPlotById(plotId)!!
+
+        val draft1 = repository.startNewSamplingSession(plot).getOrThrow()
+        val dir1 = File(tempSessionsRoot, "eval_${draft1.evaluationId}").apply { mkdirs() }
+        File(dir1, "plant_1.jpg").writeText("old")
+        repository.savePlantSample(draft1.evaluationId, 1, 5, 1, 1, 0, 0, false, null).getOrThrow()
+
+        // Inicia nova sessao na mesma quadra -> draft1 vira CANCELLED e dir1 e removido
+        val draft2 = repository.startNewSamplingSession(plot).getOrThrow()
+        assertEquals(EvaluationStatus.CANCELLED, repository.getEvaluationById(draft1.evaluationId)!!.status)
+        assertTrue(!dir1.exists())
+
+        // Refazer foto da planta 1 (mesmo plantIndex = 1) deve substituir sem duplicar sampledCount
+        val afterFirst = repository.savePlantSample(draft2.evaluationId, 1, 10, 2, 2, 0, 0, false, null).getOrThrow()
+        assertEquals(1, afterFirst.sampledCount)
+        val afterRedo = repository.savePlantSample(draft2.evaluationId, 1, 12, 3, 1, 1, 1, true, null).getOrThrow()
+        assertEquals(1, afterRedo.sampledCount)
+        assertEquals(12, afterRedo.totalNfs)
+        assertEquals(3, afterRedo.totalNfd)
+        assertEquals(1, db.evaluationDao().getSamplesByEvaluation(draft2.evaluationId).size)
+    }
+
+    @Test
+    fun `updateRealProduction aceita valor ou null apenas em avaliacoes COMPLETED e rejeita negativos`() = runBlocking {
+        val farmId = repository.saveFarm(Farm(nome = "Fazenda Real")).getOrThrow()
+        val plotId = repository.savePlot(
+            Plot(fazendaId = farmId, nome = "Roça Real", areaHa = 2.0, npt = 1000, fa = 250.0, npf = 1)
+        ).getOrThrow()
+        val plot = repository.getPlotById(plotId)!!
+
+        val draft = repository.startNewSamplingSession(plot).getOrThrow()
+        assertTrue(repository.updateRealProduction(draft.evaluationId, 50.0).isFailure)
+
+        repository.savePlantSample(draft.evaluationId, 1, 10, 0, 0, 0, 0, false, null).getOrThrow()
+        repository.finalizeSamplingSession(draft.evaluationId).getOrThrow()
+
+        assertTrue(repository.updateRealProduction(draft.evaluationId, -1.0).isFailure)
+        assertTrue(repository.updateRealProduction(draft.evaluationId, 45.5).isSuccess)
+        assertEquals(45.5, repository.getEvaluationById(draft.evaluationId)!!.producaoRealArrobas!!, 1e-6)
+
+        assertTrue(repository.updateRealProduction(draft.evaluationId, null).isSuccess)
+        assertEquals(null, repository.getEvaluationById(draft.evaluationId)!!.producaoRealArrobas)
+    }
 }

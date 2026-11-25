@@ -12,10 +12,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cacaoforecast.ai.domain.model.DiseaseSeverity
 import com.cacaoforecast.ai.domain.model.EvaluationSummary
+import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalRed
 import com.cacaoforecast.ai.ui.theme.SeverityWarningAmber
@@ -122,7 +124,9 @@ fun PlotHistoryScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(evaluations, key = { it.id }) { eval ->
+                itemsIndexed(evaluations, key = { _, item -> item.id }) { index, eval ->
+                    val previousEval = evaluations.getOrNull(index + 1)
+                    val lossDelta = previousEval?.let { eval.perdasPct - it.perdasPct }
                     val sevColor = when (eval.severity) {
                         DiseaseSeverity.CONTROLLED -> SeverityControlledGreen
                         DiseaseSeverity.WARNING -> SeverityWarningAmber
@@ -146,11 +150,22 @@ fun PlotHistoryScreen(
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Text(
-                                    text = String.format(ptBr, "Perdas: %.1f%%", eval.perdasPct),
-                                    color = sevColor,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = String.format(ptBr, "Perdas: %.1f%%", eval.perdasPct),
+                                        color = sevColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    lossDelta?.let { delta ->
+                                        val deltaColor = if (delta <= 0.0) SeverityControlledGreen else SeverityCriticalRed
+                                        Text(
+                                            text = String.format(ptBr, "Δ vs. anterior: %+.1f p.p.", delta),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = deltaColor,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
                             }
                             Text(
                                 text = String.format(
@@ -167,6 +182,29 @@ fun PlotHistoryScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (eval.nfd > 0) {
+                                Text(
+                                    text = "Podridão: ${eval.nPodridao} • Monilíase: ${eval.nMoniliase} • Vassoura: ${eval.nVassoura}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (eval.nMoniliase > 0) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = BoxMoniliaseColor
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Alerta Quarentenário: ${eval.nMoniliase} fruto(s) com Monilíase",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BoxMoniliaseColor
+                                    )
+                                }
+                            }
 
                             Spacer(modifier = Modifier.height(4.dp))
                             if (eval.producaoRealArrobas == null) {

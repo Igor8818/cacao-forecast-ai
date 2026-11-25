@@ -55,6 +55,7 @@ import com.cacaoforecast.ai.domain.model.FarmReportUiModel
 import com.cacaoforecast.ai.domain.model.Plot
 import com.cacaoforecast.ai.domain.model.ProductionBasis
 import com.cacaoforecast.ai.domain.model.ReportSortOrder
+import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
 import com.cacaoforecast.ai.ui.theme.SeverityControlledBg
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalBg
@@ -248,6 +249,38 @@ fun TabularReportContent(
                 }
             }
         } else {
+            // Card de Alerta Quarentenário de Monilíase (>= 1 fruto detectado)
+            if (report.footer.totalMoniliaseFruits > 0) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = BoxMoniliaseColor.copy(alpha = 0.12f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = BoxMoniliaseColor
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "ALERTA QUARENTENÁRIO — Monilíase (${report.footer.totalMoniliaseFruits} fruto(s))",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = BoxMoniliaseColor
+                            )
+                            Text(
+                                text = "Roças afetadas: ${report.footer.moniliaseAlertPlotNames.joinToString(", ")}. Isolar área e acionar assistência técnica CEPLAC.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+
             // Card de Destaque Fitossanitário
             report.criticalHighlightRow?.let { crit ->
                 Card(

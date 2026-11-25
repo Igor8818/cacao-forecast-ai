@@ -53,7 +53,8 @@ object FarmReportConsolidator {
                 producaoLiquidaArrobas = eval.producaoLiquidaArrobas,
                 perdasPct = eval.perdasPct,
                 severity = eval.severity,
-                dominantDisease = eval.dominantDisease
+                dominantDisease = eval.dominantDisease,
+                nMoniliase = eval.nMoniliase
             )
         }
 
@@ -105,6 +106,12 @@ object FarmReportConsolidator {
             0.0
         }
 
+        val totalMoniliaseFruits = sortedRows.sumOf { it.nMoniliase }
+        val moniliaseAlertPlotNames = sortedRows
+            .filter { it.nMoniliase > 0 }
+            .map { it.plotName }
+            .sortedBy { it.lowercase() }
+
         val footer = FarmConsolidatedFooterUiModel(
             totalPlotsEvaluated = sortedRows.size,
             totalActivePlotsInFarm = scopedActivePlots.size,
@@ -115,7 +122,9 @@ object FarmReportConsolidator {
             produtividadeConsolidadaPorHa = produtividadeConsolidada,
             totalPerdaArrobas = totalPerdaArrobas,
             perdasPonderadasPct = perdasPonderadasPct,
-            severity = ForecastCalculator.classifySeverity(perdasPonderadasPct)
+            severity = ForecastCalculator.classifySeverity(perdasPonderadasPct),
+            totalMoniliaseFruits = totalMoniliaseFruits,
+            moniliaseAlertPlotNames = moniliaseAlertPlotNames
         )
 
         return FarmReportUiModel(

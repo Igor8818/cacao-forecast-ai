@@ -344,9 +344,10 @@ class DefaultCacaoRepository(
         endMillis: Long,
         selectedPlotId: Long?,
         basis: ProductionBasis,
-        sortOrder: ReportSortOrder
+        sortOrder: ReportSortOrder,
+        periodLabel: String?
     ): Flow<FarmReportUiModel> {
-        val periodLabel = formatPeriodLabel(startMillis, endMillis)
+        val resolvedLabel = periodLabel?.takeIf { it.isNotBlank() } ?: formatPeriodLabel(startMillis, endMillis)
         return databaseGeneration.flatMapLatest {
             combine(
                 farmDao.observeById(farmId),
@@ -365,7 +366,7 @@ class DefaultCacaoRepository(
                     farm = farm,
                     allActivePlots = plots,
                     deduplicatedEvaluations = evals,
-                    periodLabel = periodLabel,
+                    periodLabel = resolvedLabel,
                     startMillis = startMillis,
                     endMillis = endMillis,
                     selectedPlotId = selectedPlotId,

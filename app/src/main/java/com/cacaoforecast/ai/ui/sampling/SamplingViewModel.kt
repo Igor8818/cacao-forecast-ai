@@ -214,6 +214,13 @@ class SamplingViewModel(
     }
 
     fun analyzeCapturedPhoto(evaluationId: Long, plantIndex: Int, photoUriString: String) {
+        val current = _uiState.value
+        if (current.currentPhotoUri == photoUriString &&
+            !current.isAnalyzingPhoto &&
+            (current.detectedBoxes.isNotEmpty() || current.manualEdited)
+        ) {
+            return
+        }
         viewModelScope.launch {
             val draft = _uiState.value.activeDraft ?: repository.getSessionDraftByEvaluationId(evaluationId)
             _uiState.update {
@@ -396,6 +403,22 @@ class SamplingViewModel(
         viewModelScope.launch {
             val summary = repository.getEvaluationById(evaluationId)
             _uiState.update { it.copy(completedSummary = summary) }
+        }
+    }
+
+    fun clearCurrentPhotoReview() {
+        _uiState.update {
+            it.copy(
+                currentPhotoUri = null,
+                detectedBoxes = emptyList(),
+                reviewNfs = 0,
+                reviewNfd = 0,
+                reviewPodridao = 0,
+                reviewMoniliase = 0,
+                reviewVassoura = 0,
+                manualEdited = false,
+                errorMessage = null
+            )
         }
     }
 
