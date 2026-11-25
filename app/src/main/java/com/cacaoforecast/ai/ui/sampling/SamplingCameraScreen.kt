@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -44,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +58,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.FileOutputStream
 import java.util.Locale
 
 @Composable
@@ -118,6 +124,35 @@ fun SamplingCameraScreen(
     var maxZoom by remember { mutableFloatStateOf(4f) }
     var isCapturing by remember { mutableStateOf(false) }
     var cameraError by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { pickedUri ->
+        if (pickedUri == null) return@rememberLauncherForActivityResult
+        isCapturing = true
+        cameraError = null
+        coroutineScope.launch {
+            val copyResult = withContext(Dispatchers.IO) {
+                runCatching {
+                    val targetFile = viewModel.sessionPhotoFile(evaluationId, plantIndex)
+                    targetFile.parentFile?.mkdirs()
+                    val input = context.contentResolver.openInputStream(pickedUri)
+                        ?: error("Não foi possível abrir a imagem selecionada.")
+                    input.use { stream ->
+                        FileOutputStream(targetFile).use { out ->
+                            stream.copyTo(out)
+                        }
+                    }
+                    Uri.fromFile(targetFile).toString()
+                }
+            }
+            isCapturing = false
+            copyResult
+                .onSuccess { uriStr -> onPhotoCaptured(evaluationId, plantIndex, uriStr) }
+                .onFailure { err -> cameraError = err.message ?: "Erro ao importar imagem da galeria." }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         if (!hasPermission) {
@@ -161,6 +196,15 @@ fun SamplingCameraScreen(
                             ) {
                                 Text("Configurações")
                             }
+                        }
+                        OutlinedButton(
+                            onClick = { galleryLauncher.launch("image/*") },
+                            enabled = !isCapturing,
+                            modifier = Modifier.fillMaxWidth().height(52.dp)
+                        ) {
+                            Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Importar Foto da Galeria (Modo Teste)")
                         }
                         TextButton(onClick = { showExitDialog = true }) {
                             Text("Voltar")
@@ -260,35 +304,53 @@ fun SamplingCameraScreen(
                             }
                         }
                     }
-                    Button(
-                        onClick = {
-                            if (isCapturing) return@Button
-                            isCapturing = true
-                            cameraError = null
-                            val file = viewModel.sessionPhotoFile(evaluationId, plantIndex)
-                            captureToPrivateFile(
-                                context = context,
-                                imageCapture = imageCapture,
-                                targetFile = file,
-                                onError = { err ->
-                                    isCapturing = false
-                                    cameraError = err
-                                },
-                                onSuccess = { uri ->
-                                    isCapturing = false
-                                    onPhotoCaptured(evaluationId, plantIndex, uri.toString())
-                                }
-                            )
-                        },
-                        enabled = !isCapturing,
-                        shape = CircleShape,
-                        modifier = Modifier.size(76.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = "Capturar Planta",
-                            modifier = Modifier.size(34.dp)
-                        )
+                        OutlinedButton(
+                            onClick = { galleryLauncher.launch("image/*") },
+                            enabled = !isCapturing,
+                            modifier = Modifier.height(52.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoLibrary,
+                                contentDescription = "Importar da Galeria",
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Galeria", color = Color.White)
+                        }
+                        Button(
+                            onClick = {
+                                if (isCapturing) return@Button
+                                isCapturing = true
+                                cameraError = null
+                                val file = viewModel.sessionPhotoFile(evaluationId, plantIndex)
+                                captureToPrivateFile(
+                                    context = context,
+                                    imageCapture = imageCapture,
+                                    targetFile = file,
+                                    onError = { err ->
+                                        isCapturing = false
+                                        cameraError = err
+                                    },
+                                    onSuccess = { uri ->
+                                        isCapturing = false
+                                        onPhotoCaptured(evaluationId, plantIndex, uri.toString())
+                                    }
+                                )
+                            },
+                            enabled = !isCapturing,
+                            shape = CircleShape,
+                            modifier = Modifier.size(76.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "Capturar Planta",
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
                     }
                     Text(
                         text = "Sadios acumulados: ${draft?.totalNfs ?: 0} • Doentes: ${draft?.totalNfd ?: 0}",

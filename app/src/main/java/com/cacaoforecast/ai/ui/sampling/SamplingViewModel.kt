@@ -269,14 +269,20 @@ class SamplingViewModel(
         }
     }
 
-    /** Toque na caixa alterna: Sadio -> Doente (Podridão Parda) -> Remover. */
+    /** Toque na caixa alterna: Sadio -> Podridão Parda -> Monilíase -> Vassoura de Bruxa -> Remover. */
     fun cycleDetectedBox(boxId: String) {
         val current = _uiState.value
         val box = current.detectedBoxes.find { it.id == boxId } ?: return
-        val nextBoxes = if (!box.category.isDiseased) {
+        val nextCategory = when (box.category) {
+            FruitHealthCategory.SADIO -> FruitHealthCategory.PODRIDAO_PARDA
+            FruitHealthCategory.PODRIDAO_PARDA -> FruitHealthCategory.MONILIASE
+            FruitHealthCategory.MONILIASE -> FruitHealthCategory.VASSOURA_BRUXA
+            FruitHealthCategory.VASSOURA_BRUXA -> null
+        }
+        val nextBoxes = if (nextCategory != null) {
             current.detectedBoxes.map {
                 if (it.id == boxId) {
-                    it.copy(category = FruitHealthCategory.PODRIDAO_PARDA, isManualOverride = true)
+                    it.copy(category = nextCategory, isManualOverride = true)
                 } else {
                     it
                 }
@@ -329,6 +335,37 @@ class SamplingViewModel(
             val nextVassoura = state.reviewVassoura.coerceAtMost((remaining - nextMoniliase).coerceAtLeast(0))
             state.copy(
                 reviewNfd = nextNfd,
+                reviewPodridao = nextPodridao,
+                reviewMoniliase = nextMoniliase,
+                reviewVassoura = nextVassoura,
+                manualEdited = true
+            )
+        }
+    }
+
+    fun adjustDiseaseTypeCount(category: FruitHealthCategory, delta: Int) {
+        if (category == FruitHealthCategory.SADIO) {
+            adjustHealthyCount(delta)
+            return
+        }
+        _uiState.update { state ->
+            val nextPodridao = if (category == FruitHealthCategory.PODRIDAO_PARDA) {
+                (state.reviewPodridao + delta).coerceAtLeast(0)
+            } else {
+                state.reviewPodridao
+            }
+            val nextMoniliase = if (category == FruitHealthCategory.MONILIASE) {
+                (state.reviewMoniliase + delta).coerceAtLeast(0)
+            } else {
+                state.reviewMoniliase
+            }
+            val nextVassoura = if (category == FruitHealthCategory.VASSOURA_BRUXA) {
+                (state.reviewVassoura + delta).coerceAtLeast(0)
+            } else {
+                state.reviewVassoura
+            }
+            state.copy(
+                reviewNfd = nextPodridao + nextMoniliase + nextVassoura,
                 reviewPodridao = nextPodridao,
                 reviewMoniliase = nextMoniliase,
                 reviewVassoura = nextVassoura,

@@ -59,7 +59,8 @@ fun CacaoNavGraph(appContainer: AppContainer) {
         val reportViewModel: FarmReportViewModel = viewModel(
             factory = FarmReportViewModel.Factory(
                 repository = appContainer.repository,
-                pdfReportGenerator = appContainer.pdfReportGenerator
+                pdfReportGenerator = appContainer.pdfReportGenerator,
+                csvReportExporter = appContainer.csvReportExporter
             )
         )
 

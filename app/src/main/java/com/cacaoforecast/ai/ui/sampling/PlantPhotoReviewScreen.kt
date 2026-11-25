@@ -180,7 +180,7 @@ fun PlantPhotoReviewScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Toque em uma caixa para alternar (Sadio → Doente → Remover) ou ajuste nos botões:",
+                    text = "Toque na caixa para ciclar (Sadio → P. Parda → Monil. → Vassoura → Remover) ou ajuste abaixo:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -203,14 +203,6 @@ fun PlantPhotoReviewScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-                if (uiState.reviewNfd > 0) {
-                    Text(
-                        text = "Doenças: Podridão ${uiState.reviewPodridao} • Monilíase ${uiState.reviewMoniliase} • Vassoura ${uiState.reviewVassoura}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (uiState.reviewMoniliase > 0) BoxMoniliaseColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = if (uiState.reviewMoniliase > 0) FontWeight.Bold else FontWeight.Normal
-                    )
                 }
 
                 uiState.errorMessage?.let { err ->
@@ -235,6 +227,36 @@ fun PlantPhotoReviewScreen(
                         accent = SeverityCriticalRed,
                         onDecrement = { viewModel.adjustDiseasedCount(-1) },
                         onIncrement = { viewModel.adjustDiseasedCount(1) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    DiseaseMiniCounter(
+                        label = "P. Parda",
+                        count = uiState.reviewPodridao,
+                        accent = BoxPodridaoColor,
+                        onDecrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.PODRIDAO_PARDA, -1) },
+                        onIncrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.PODRIDAO_PARDA, 1) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    DiseaseMiniCounter(
+                        label = "Monilíase",
+                        count = uiState.reviewMoniliase,
+                        accent = BoxMoniliaseColor,
+                        onDecrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.MONILIASE, -1) },
+                        onIncrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.MONILIASE, 1) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    DiseaseMiniCounter(
+                        label = "Vassoura",
+                        count = uiState.reviewVassoura,
+                        accent = BoxVassouraColor,
+                        onDecrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.VASSOURA_BRUXA, -1) },
+                        onIncrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.VASSOURA_BRUXA, 1) },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -292,6 +314,52 @@ private fun ReviewLegendItem(color: Color, label: String) {
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun DiseaseMiniCounter(
+    label: String,
+    count: Int,
+    accent: Color,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.10f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = accent,
+                maxLines = 1
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                IconButton(onClick = onDecrement, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Default.Remove, contentDescription = "Diminuir $label", modifier = Modifier.size(16.dp))
+                }
+                Text(
+                    text = count.toString(),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onIncrement, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Default.Add, contentDescription = "Aumentar $label", modifier = Modifier.size(16.dp))
+                }
+            }
+        }
     }
 }
 

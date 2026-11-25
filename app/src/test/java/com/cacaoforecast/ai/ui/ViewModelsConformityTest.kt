@@ -15,6 +15,7 @@ import com.cacaoforecast.ai.domain.model.Farm
 import com.cacaoforecast.ai.domain.model.Plot
 import com.cacaoforecast.ai.domain.model.ProductionBasis
 import com.cacaoforecast.ai.domain.model.ReportSortOrder
+import com.cacaoforecast.ai.pdf.CsvReportExporter
 import com.cacaoforecast.ai.pdf.PdfReportGenerator
 import com.cacaoforecast.ai.ui.farms.FarmsViewModel
 import com.cacaoforecast.ai.ui.history.PlotHistoryViewModel
@@ -190,20 +191,40 @@ class ViewModelsConformityTest {
         assertEquals(1, analyzed.reviewMoniliase)
         assertFalse(analyzed.manualEdited)
 
-        // Toque na caixa Sadio -> promove para Podridao Parda
+        // Toque na caixa Sadio -> Podridao Parda -> Moniliase -> Vassoura de Bruxa -> remove
         vm.cycleDetectedBox("box1")
         assertEquals(0, vm.uiState.value.reviewNfs)
         assertEquals(2, vm.uiState.value.reviewNfd)
         assertEquals(1, vm.uiState.value.reviewPodridao)
         assertEquals(1, vm.uiState.value.reviewMoniliase)
+        assertEquals(0, vm.uiState.value.reviewVassoura)
         assertTrue(vm.uiState.value.manualEdited)
         assertTrue(vm.uiState.value.detectedBoxes.first { it.id == "box1" }.isManualOverride)
 
-        // Segundo toque na mesma caixa -> remove
+        vm.cycleDetectedBox("box1")
+        assertEquals(FruitHealthCategory.MONILIASE, vm.uiState.value.detectedBoxes.first { it.id == "box1" }.category)
+        assertEquals(2, vm.uiState.value.reviewMoniliase)
+
+        vm.cycleDetectedBox("box1")
+        assertEquals(FruitHealthCategory.VASSOURA_BRUXA, vm.uiState.value.detectedBoxes.first { it.id == "box1" }.category)
+        assertEquals(1, vm.uiState.value.reviewVassoura)
+
+        // Quarto toque na mesma caixa -> remove
         vm.cycleDetectedBox("box1")
         assertEquals(0, vm.uiState.value.reviewNfs)
         assertEquals(1, vm.uiState.value.reviewNfd)
         assertEquals(0, vm.uiState.value.reviewPodridao)
+        assertEquals(1, vm.uiState.value.reviewMoniliase)
+        assertEquals(0, vm.uiState.value.reviewVassoura)
+
+        // Ajuste especifico por tipo de doenca (Podridao, Moniliase, Vassoura)
+        vm.adjustDiseaseTypeCount(FruitHealthCategory.PODRIDAO_PARDA, 2)
+        vm.adjustDiseaseTypeCount(FruitHealthCategory.VASSOURA_BRUXA, 1)
+        vm.adjustDiseaseTypeCount(FruitHealthCategory.MONILIASE, -1)
+        assertEquals(2, vm.uiState.value.reviewPodridao)
+        assertEquals(0, vm.uiState.value.reviewMoniliase)
+        assertEquals(1, vm.uiState.value.reviewVassoura)
+        assertEquals(3, vm.uiState.value.reviewNfd)
 
         // Ajustes +/- respeitando piso zero
         vm.adjustHealthyCount(2)
@@ -211,11 +232,11 @@ class ViewModelsConformityTest {
         assertEquals(0, vm.uiState.value.reviewNfs)
 
         vm.adjustDiseasedCount(1)
-        assertEquals(2, vm.uiState.value.reviewNfd)
+        assertEquals(4, vm.uiState.value.reviewNfd)
 
         // Re-chamar analyzeCapturedPhoto com mesma URI nao sobrescreve edicao manual
         vm.analyzeCapturedPhoto(evalId, 1, Uri.fromFile(photo1).toString())
-        assertEquals(2, vm.uiState.value.reviewNfd)
+        assertEquals(4, vm.uiState.value.reviewNfd)
         assertTrue(vm.uiState.value.manualEdited)
 
         // clearCurrentPhotoReview limpa o estado antes de refazer foto
@@ -280,8 +301,8 @@ class ViewModelsConformityTest {
         val updatedHistory = historyVm.evaluations.awaitValue { it.singleOrNull()?.producaoRealArrobas != null }
         assertEquals(38.5, updatedHistory.single().producaoRealArrobas!!, 1e-6)
 
-        // FarmReportViewModel: filtros e bloqueio de PDF quando vazio (sem depender de coletor em farms)
-        val reportVm = FarmReportViewModel(repository, PdfReportGenerator(context))
+        // FarmReportViewModel: filtros e bloqueio de PDF/CSV quando vazio (sem depender de coletor em farms)
+        val reportVm = FarmReportViewModel(repository, PdfReportGenerator(context), CsvReportExporter(context))
         reportVm.selectFarm(farmId)
         reportVm.selectPeriod(1_000_000L, 3_000_000L, "Período Teste")
 
@@ -292,6 +313,17 @@ class ViewModelsConformityTest {
         assertEquals(192.0, initialReport.footer.totalProducaoExibidaArrobas, 1e-6) // 72 + 120
         assertEquals(5, initialReport.footer.totalMoniliaseFruits)
         assertEquals(listOf("Roça Sul"), initialReport.footer.moniliaseAlertPlotNames)
+
+        // Exporta CSV com dados -> cria arquivo valido em cacheDir/reports
+        var exportedCsv: File? = null
+        reportVm.generateCsv { file, _ -> exportedCsv = file }
+        val startWait = System.currentTimeMillis()
+        while (exportedCsv == null && System.currentTimeMillis() - startWait < 3_000L) {
+            kotlinx.coroutines.delay(25)
+        }
+        assertNotNull(exportedCsv)
+        assertTrue(exportedCsv!!.exists())
+        exportedCsv!!.delete()
 
         // Verifica Relatorio Cumulativo (Modo 2) vinculado a Roça Norte com producao real lancada
         reportVm.selectCumulativePlot(plot1Id)
@@ -315,12 +347,15 @@ class ViewModelsConformityTest {
         val singlePlotReport = reportVm.report.awaitValue { it != null && it.rows.size == 1 }!!
         assertEquals(plot1Id, singlePlotReport.rows.single().plotId)
 
-        // Periodo sem dados bloqueia geracao de PDF
+        // Periodo sem dados bloqueia geracao de PDF e CSV
         reportVm.selectPeriod(9_000_000L, 10_000_000L, "Vazio")
         reportVm.report.awaitValue { it != null && it.rows.isEmpty() }
         var pdfCalled = false
         reportVm.generatePdf { _, _ -> pdfCalled = true }
         assertFalse(pdfCalled)
+        var csvCalled = false
+        reportVm.generateCsv { _, _ -> csvCalled = true }
+        assertFalse(csvCalled)
         assertNotNull(reportVm.message.value)
     }
 }

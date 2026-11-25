@@ -108,6 +108,17 @@ fun ReportsHubScreen(
                             )
                         }
                     },
+                    onExportCsv = {
+                        viewModel.generateCsv { file, caption ->
+                            ReportShareHelper.shareFileGeneric(
+                                context = context,
+                                file = file,
+                                mimeType = "text/csv",
+                                chooserTitle = "Exportar Planilha CSV",
+                                caption = caption
+                            )
+                        }
+                    },
                     onNavigateToFarms = onNavigateToFarms
                 )
             } else {

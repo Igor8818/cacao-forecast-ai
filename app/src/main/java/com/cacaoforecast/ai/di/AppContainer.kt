@@ -7,6 +7,7 @@ import com.cacaoforecast.ai.data.repository.DefaultCacaoRepository
 import com.cacaoforecast.ai.domain.ml.FruitAnalysisEngine
 import com.cacaoforecast.ai.domain.repository.CacaoRepository
 import com.cacaoforecast.ai.ml.TfliteFruitAnalysisEngine
+import com.cacaoforecast.ai.pdf.CsvReportExporter
 import com.cacaoforecast.ai.pdf.PdfReportGenerator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +40,10 @@ class AppContainer(context: Context) {
 
     val pdfReportGenerator: PdfReportGenerator by lazy {
         PdfReportGenerator(appContext)
+    }
+
+    val csvReportExporter: CsvReportExporter by lazy {
+        CsvReportExporter(appContext)
     }
 
     val backupManager: SqliteBackupManager by lazy {

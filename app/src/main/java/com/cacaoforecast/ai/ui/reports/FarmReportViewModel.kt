@@ -11,6 +11,7 @@ import com.cacaoforecast.ai.domain.model.Plot
 import com.cacaoforecast.ai.domain.model.ProductionBasis
 import com.cacaoforecast.ai.domain.model.ReportSortOrder
 import com.cacaoforecast.ai.domain.repository.CacaoRepository
+import com.cacaoforecast.ai.pdf.CsvReportExporter
 import com.cacaoforecast.ai.pdf.PdfReportGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,7 +43,8 @@ data class ReportFilterState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class FarmReportViewModel(
     private val repository: CacaoRepository,
-    private val pdfReportGenerator: PdfReportGenerator
+    private val pdfReportGenerator: PdfReportGenerator,
+    private val csvReportExporter: CsvReportExporter
 ) : ViewModel() {
 
     private val activeFarmsSource = repository.observeActiveFarms()
@@ -164,6 +166,27 @@ class FarmReportViewModel(
         }
     }
 
+    fun generateCsv(onGenerated: (File, String) -> Unit) {
+        val currentReport = report.value ?: return
+        if (currentReport.rows.isEmpty()) {
+            _message.value = "Não há avaliações concluídas neste período para exportar planilha CSV."
+            return
+        }
+        viewModelScope.launch {
+            _isGeneratingPdf.value = true
+            val res = withContext(Dispatchers.IO) {
+                csvReportExporter.export(currentReport)
+            }
+            _isGeneratingPdf.value = false
+            res.onSuccess { file ->
+                val caption = "Planilha CSV CacaoForecastAI • ${currentReport.farm.nome} (${currentReport.periodLabel})"
+                onGenerated(file, caption)
+            }.onFailure { err ->
+                _message.value = err.message ?: "Erro ao exportar CSV."
+            }
+        }
+    }
+
     fun clearMessage() {
         _message.value = null
     }
@@ -216,11 +239,12 @@ class FarmReportViewModel(
 
     class Factory(
         private val repository: CacaoRepository,
-        private val pdfReportGenerator: PdfReportGenerator
+        private val pdfReportGenerator: PdfReportGenerator,
+        private val csvReportExporter: CsvReportExporter
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return FarmReportViewModel(repository, pdfReportGenerator) as T
+            return FarmReportViewModel(repository, pdfReportGenerator, csvReportExporter) as T
         }
     }
 }

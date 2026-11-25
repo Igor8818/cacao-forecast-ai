@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -81,6 +82,7 @@ fun TabularReportContent(
     onSelectSortOrder: (ReportSortOrder) -> Unit,
     onShareWhatsApp: () -> Unit,
     onShareGenericPdf: () -> Unit,
+    onExportCsv: () -> Unit,
     onNavigateToFarms: () -> Unit
 ) {
     if (farms.isEmpty()) {
@@ -463,6 +465,15 @@ fun TabularReportContent(
                 Icon(Icons.Default.Share, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Compartilhar / Salvar PDF")
+            }
+            OutlinedButton(
+                onClick = onExportCsv,
+                enabled = !isGeneratingPdf && report.rows.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth().height(52.dp)
+            ) {
+                Icon(Icons.Default.TableChart, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Exportar Planilha (.csv)")
             }
         }
     }
