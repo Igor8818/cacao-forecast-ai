@@ -1,0 +1,33 @@
+# Environments & Secrets
+.env
+.env.*
+!.env.example
+
+# Android & Gradle
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+*.apk
+*.aab
+.cxx/
+captures/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node.js
+node_modules/
+dist/
+.next/
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
