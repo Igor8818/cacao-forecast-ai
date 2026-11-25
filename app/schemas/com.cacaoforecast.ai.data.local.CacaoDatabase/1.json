@@ -1,0 +1,486 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "1f1bb6ad3d1f32551c5d97767df8fda8",
+    "entities": [
+      {
+        "tableName": "fazendas",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nome` TEXT NOT NULL, `municipio_uf` TEXT, `proprietario` TEXT, `ativo` INTEGER NOT NULL, `criado_em` INTEGER NOT NULL, `atualizado_em` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nome",
+            "columnName": "nome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "municipioUf",
+            "columnName": "municipio_uf",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "proprietario",
+            "columnName": "proprietario",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ativo",
+            "columnName": "ativo",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "criadoEm",
+            "columnName": "criado_em",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "atualizadoEm",
+            "columnName": "atualizado_em",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_fazendas_ativo_nome",
+            "unique": false,
+            "columnNames": [
+              "ativo",
+              "nome"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_fazendas_ativo_nome` ON `${TABLE_NAME}` (`ativo`, `nome`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "quadras",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fazenda_id` INTEGER NOT NULL, `nome` TEXT NOT NULL, `area_ha` REAL NOT NULL, `npt` INTEGER NOT NULL, `fa` REAL NOT NULL, `npf` INTEGER NOT NULL, `ativo` INTEGER NOT NULL, `criado_em` INTEGER NOT NULL, `atualizado_em` INTEGER NOT NULL, FOREIGN KEY(`fazenda_id`) REFERENCES `fazendas`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fazendaId",
+            "columnName": "fazenda_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nome",
+            "columnName": "nome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "areaHa",
+            "columnName": "area_ha",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "npt",
+            "columnName": "npt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fa",
+            "columnName": "fa",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "npf",
+            "columnName": "npf",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ativo",
+            "columnName": "ativo",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "criadoEm",
+            "columnName": "criado_em",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "atualizadoEm",
+            "columnName": "atualizado_em",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_quadras_fazenda_ativo",
+            "unique": false,
+            "columnNames": [
+              "fazenda_id",
+              "ativo",
+              "nome"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_quadras_fazenda_ativo` ON `${TABLE_NAME}` (`fazenda_id`, `ativo`, `nome`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "fazendas",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fazenda_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "avaliacoes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fazenda_id` INTEGER NOT NULL, `quadra_id` INTEGER NOT NULL, `status` TEXT NOT NULL, `snapshot_quadra_nome` TEXT NOT NULL, `snapshot_area_ha` REAL NOT NULL, `snapshot_npt` INTEGER NOT NULL, `snapshot_fa` REAL NOT NULL, `snapshot_npf` INTEGER NOT NULL, `n_plantas_amostradas` INTEGER NOT NULL, `n_frutos_sadios` INTEGER NOT NULL, `n_frutos_doentes` INTEGER NOT NULL, `n_podridao_parda` INTEGER NOT NULL, `n_moniliase` INTEGER NOT NULL, `n_vassoura_bruxa` INTEGER NOT NULL, `producao_estimada` REAL NOT NULL, `producao_estimada_liquida` REAL NOT NULL, `produtividade` REAL NOT NULL, `produtividade_liquida` REAL NOT NULL, `perdas_pct` REAL NOT NULL, `producao_real` REAL, `producao_real_em` INTEGER, `iniciado_em` INTEGER NOT NULL, `data` INTEGER NOT NULL, FOREIGN KEY(`fazenda_id`) REFERENCES `fazendas`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`quadra_id`) REFERENCES `quadras`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fazendaId",
+            "columnName": "fazenda_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quadraId",
+            "columnName": "quadra_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snapshotQuadraNome",
+            "columnName": "snapshot_quadra_nome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snapshotAreaHa",
+            "columnName": "snapshot_area_ha",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snapshotNpt",
+            "columnName": "snapshot_npt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snapshotFa",
+            "columnName": "snapshot_fa",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snapshotNpf",
+            "columnName": "snapshot_npf",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nPlantasAmostradas",
+            "columnName": "n_plantas_amostradas",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nFrutosSadios",
+            "columnName": "n_frutos_sadios",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nFrutosDoentes",
+            "columnName": "n_frutos_doentes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nPodridaoParda",
+            "columnName": "n_podridao_parda",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nMoniliase",
+            "columnName": "n_moniliase",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nVassouraBruxa",
+            "columnName": "n_vassoura_bruxa",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "producaoEstimada",
+            "columnName": "producao_estimada",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "producaoEstimadaLiquida",
+            "columnName": "producao_estimada_liquida",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "produtividade",
+            "columnName": "produtividade",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "produtividadeLiquida",
+            "columnName": "produtividade_liquida",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "perdasPct",
+            "columnName": "perdas_pct",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "producaoReal",
+            "columnName": "producao_real",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "producaoRealEm",
+            "columnName": "producao_real_em",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "iniciadoEm",
+            "columnName": "iniciado_em",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "data",
+            "columnName": "data",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_avaliacoes_relatorio",
+            "unique": false,
+            "columnNames": [
+              "fazenda_id",
+              "status",
+              "data"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_avaliacoes_relatorio` ON `${TABLE_NAME}` (`fazenda_id`, `status`, `data`)"
+          },
+          {
+            "name": "idx_avaliacoes_quadra_status",
+            "unique": false,
+            "columnNames": [
+              "quadra_id",
+              "status",
+              "data"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_avaliacoes_quadra_status` ON `${TABLE_NAME}` (`quadra_id`, `status`, `data`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "fazendas",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fazenda_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "quadras",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "quadra_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "amostras_planta",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `avaliacao_id` INTEGER NOT NULL, `indice_planta` INTEGER NOT NULL, `n_sadios` INTEGER NOT NULL, `n_doentes` INTEGER NOT NULL, `n_podridao_parda` INTEGER NOT NULL, `n_moniliase` INTEGER NOT NULL, `n_vassoura_bruxa` INTEGER NOT NULL, `editado_manualmente` INTEGER NOT NULL, `foto_temp_path` TEXT, `capturado_em` INTEGER NOT NULL, FOREIGN KEY(`avaliacao_id`) REFERENCES `avaliacoes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avaliacaoId",
+            "columnName": "avaliacao_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "indicePlanta",
+            "columnName": "indice_planta",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nSadios",
+            "columnName": "n_sadios",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nDoentes",
+            "columnName": "n_doentes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nPodridaoParda",
+            "columnName": "n_podridao_parda",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nMoniliase",
+            "columnName": "n_moniliase",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nVassouraBruxa",
+            "columnName": "n_vassoura_bruxa",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "editadoManualmente",
+            "columnName": "editado_manualmente",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fotoTempPath",
+            "columnName": "foto_temp_path",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "capturadoEm",
+            "columnName": "capturado_em",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_amostras_avaliacao_indice",
+            "unique": true,
+            "columnNames": [
+              "avaliacao_id",
+              "indice_planta"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `idx_amostras_avaliacao_indice` ON `${TABLE_NAME}` (`avaliacao_id`, `indice_planta`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "avaliacoes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "avaliacao_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1f1bb6ad3d1f32551c5d97767df8fda8')"
+    ]
+  }
+}
