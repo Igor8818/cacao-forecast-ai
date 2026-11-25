@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Cantoneiras de lente / visão computacional -->
+    <path
+        android:strokeColor="#D3ECDC"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M28,38 L28,28 L38,28" />
+    <path
+        android:strokeColor="#D3ECDC"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M70,28 L80,28 L80,38" />
+    <path
+        android:strokeColor="#D3ECDC"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M28,70 L28,80 L38,80" />
+    <path
+        android:strokeColor="#D3ECDC"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M70,80 L80,80 L80,70" />
+
+    <!-- Haste do fruto -->
+    <path
+        android:strokeColor="#8D5A2B"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,26 L54,32" />
+
+    <!-- Silhueta do fruto de cacau dourado -->
+    <path
+        android:fillColor="#F4B400"
+        android:pathData="M54,31 C65,31 71,41 70,54 C69,67 61,77 54,79 C47,77 39,67 38,54 C37,41 43,31 54,31 Z" />
+
+    <!-- Sulcos / nervuras longitudinais do cacau -->
+    <path
+        android:strokeColor="#C67D0A"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round"
+        android:pathData="M54,33 L54,77" />
+    <path
+        android:strokeColor="#C67D0A"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round"
+        android:pathData="M46,36 C43,48 44,64 49,75" />
+    <path
+        android:strokeColor="#C67D0A"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round"
+        android:pathData="M62,36 C65,48 64,64 59,75" />
+
+    <!-- Brilho sutil -->
+    <path
+        android:strokeColor="#FFF6CC"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:pathData="M44,44 C43,49 43,54 44,58" />
+</vector>

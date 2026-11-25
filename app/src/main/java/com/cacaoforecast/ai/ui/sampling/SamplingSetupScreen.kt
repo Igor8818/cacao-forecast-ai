@@ -14,17 +14,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
@@ -32,8 +35,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +47,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cacaoforecast.ai.domain.model.Plot
+import com.cacaoforecast.ai.ui.components.BrandTopAppBar
+import com.cacaoforecast.ai.ui.components.GlossaryHelpSheet
+import com.cacaoforecast.ai.ui.components.SolarCard
+import com.cacaoforecast.ai.ui.theme.CacaoCardBorder
+import com.cacaoforecast.ai.ui.theme.CacaoForestContainer
+import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
+import com.cacaoforecast.ai.ui.theme.CacaoSurfaceCard
 import com.cacaoforecast.ai.ui.theme.SeverityWarningAmber
 import com.cacaoforecast.ai.ui.theme.SeverityWarningBg
 import kotlinx.coroutines.flow.flowOf
@@ -62,6 +70,7 @@ fun SamplingSetupScreen(
 ) {
     val farms by viewModel.farms.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val ptBr = remember { Locale("pt", "BR") }
 
     LaunchedEffect(preselectedFarmId, preselectedPlotId) {
         viewModel.initializeSetup(preselectedFarmId, preselectedPlotId)
@@ -87,16 +96,18 @@ fun SamplingSetupScreen(
     }
 
     var farmDropdownExpanded by remember { mutableStateOf(false) }
-    var plotDropdownExpanded by remember { mutableStateOf(false) }
+    var showGlossary by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Amostragem em Campo", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+            BrandTopAppBar(
+                title = "Amostragem em Campo",
+                subtitle = "Selecione a fazenda e a roça",
+                actions = {
+                    IconButton(onClick = { showGlossary = true }) {
+                        Icon(Icons.Default.HelpOutline, contentDescription = "Guia Rápido")
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -108,21 +119,26 @@ fun SamplingSetupScreen(
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text("Cadastre uma fazenda primeiro", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Para iniciar a contagem com IA, é necessário ter ao menos uma Fazenda e uma Roça / Quadra cadastradas.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Button(
-                        onClick = onNavigateToFarms,
-                        modifier = Modifier.height(52.dp)
+                SolarCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("Ir para Fazendas")
+                        Text("Cadastre uma fazenda primeiro", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "Para iniciar a contagem com IA, cadastre ao menos uma Fazenda e uma Roça / Quadra.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = onNavigateToFarms,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                        ) {
+                            Text("Ir para Fazendas")
+                        }
                     }
                 }
             }
@@ -133,11 +149,12 @@ fun SamplingSetupScreen(
                     .padding(innerPadding)
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 uiState.pendingResumeDraft?.let { draft ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = SeverityWarningBg),
+                    SolarCard(
+                        containerColor = SeverityWarningBg,
+                        borderColor = SeverityWarningAmber.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -166,7 +183,7 @@ fun SamplingSetupScreen(
                                     },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(52.dp)
+                                        .height(50.dp)
                                 ) {
                                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -174,9 +191,9 @@ fun SamplingSetupScreen(
                                 }
                                 TextButton(
                                     onClick = { viewModel.discardPendingDraft(draft.evaluationId) },
-                                    modifier = Modifier.height(52.dp)
+                                    modifier = Modifier.height(50.dp)
                                 ) {
-                                    Text("Descartar Rascunho", color = MaterialTheme.colorScheme.error)
+                                    Text("Descartar", color = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }
@@ -216,7 +233,7 @@ fun SamplingSetupScreen(
                 }
 
                 if (plots.isEmpty()) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    SolarCard(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -234,66 +251,75 @@ fun SamplingSetupScreen(
                         }
                     }
                 } else {
-                    ExposedDropdownMenuBox(
-                        expanded = plotDropdownExpanded,
-                        onExpandedChange = { plotDropdownExpanded = !plotDropdownExpanded }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedPlot?.nome ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Roça / Quadra") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = plotDropdownExpanded) },
-                            modifier = Modifier
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                                .fillMaxWidth()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = plotDropdownExpanded,
-                            onDismissRequest = { plotDropdownExpanded = false }
+                    Text(
+                        text = "Escolha a Roça / Quadra (1 toque):",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    plots.forEach { plot ->
+                        val isSelected = plot.id == selectedPlot?.id
+                        SolarCard(
+                            onClick = { viewModel.selectPlot(plot.id) },
+                            containerColor = if (isSelected) CacaoForestContainer.copy(alpha = 0.45f) else CacaoSurfaceCard,
+                            borderColor = if (isSelected) CacaoForestPrimary else CacaoCardBorder,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            plots.forEach { plot ->
-                                DropdownMenuItem(
-                                    text = { Text("${plot.nome} (${plot.npf} plantas)") },
-                                    onClick = {
-                                        viewModel.selectPlot(plot.id)
-                                        plotDropdownExpanded = false
-                                    }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = null,
+                                    tint = if (isSelected) CacaoForestPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = plot.nome,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = String.format(
+                                            ptBr,
+                                            "%.2f ha • %d pés • FA %.0f • Meta: %d fotos",
+                                            plot.areaHa,
+                                            plot.npt,
+                                            plot.fa,
+                                            plot.npf
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
 
-                    selectedPlot?.let { plot ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    SolarCard(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    "Parâmetros Congelados na Avaliação",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    String.format(
-                                        Locale("pt", "BR"),
-                                        "Área: %.2f ha • NPT: %d plantas • FA: %.0f frutos/@",
-                                        plot.areaHa,
-                                        plot.npt,
-                                        plot.fa
-                                    )
-                                )
-                                Text(
-                                    "Meta obrigatória: ${plot.npf} plantas (1 foto por cacaueiro).",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.Route,
+                                contentDescription = null,
+                                tint = CacaoForestPrimary
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Dica de campo: caminhe em zigue-zague pela roça e tire 1 foto frontal do tronco/copa baixa (~1,5 m) de cada árvore.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
+                    }
 
+                    selectedPlot?.let { plot ->
                         uiState.errorMessage?.let { err ->
                             Text(
                                 text = err,
@@ -316,19 +342,25 @@ fun SamplingSetupScreen(
                             if (uiState.isPreparingEngine) {
                                 CircularProgressIndicator(
                                     color = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.height(22.dp).width(22.dp)
+                                    modifier = Modifier
+                                        .height(22.dp)
+                                        .width(22.dp)
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
-                                Text("Preparando IA CEPEC...")
+                                Text("Preparando IA CacauLens...")
                             } else {
                                 Icon(Icons.Default.CameraAlt, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Iniciar Nova Amostragem (${plot.npf} plantas)")
+                                Text("Iniciar Amostragem (${plot.npf} plantas)")
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showGlossary) {
+        GlossaryHelpSheet(onDismiss = { showGlossary = false })
     }
 }

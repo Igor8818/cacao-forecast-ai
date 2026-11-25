@@ -1,24 +1,25 @@
-# CacaoForecastAI
+# CacauLens
 
 [![Android CI](https://github.com/Igor8818/cacao-forecast-ai/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Igor8818/cacao-forecast-ai/actions/workflows/android-ci.yml)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
 ![TensorFlow Lite](https://img.shields.io/badge/TFLite-2.16.1%20%7C%20XNNPACK-FF6F00?logo=tensorflow&logoColor=white)
-![Unit Tests](https://img.shields.io/badge/Unit%20Tests-51%20Passing-2EA44F)
+![Unit Tests](https://img.shields.io/badge/Unit%20Tests-53%20Passing-2EA44F)
 ![Architecture](https://img.shields.io/badge/Architecture-Offline--First%20MVVM-1B4D2E)
 
-Aplicativo Android nativo (**Offline-First**) para previsão de safra em arrobas (`@`), monitoramento fitossanitário e alerta quarentenário de cacau com visão computacional embarcada (modelos TFLite CEPEC).
+Aplicativo Android nativo (**Offline-First**, anteriormente codinome *CacaoForecastAI*) para previsão de safra em arrobas (`@`), monitoramento fitossanitário e alerta quarentenário de cacau com visão computacional embarcada (modelos TFLite CEPEC).
 
 <details>
 <summary>🇺🇸 <strong>Read in English — Executive Summary for Tech Recruiters &amp; Engineering Teams</strong></summary>
 
-**CacaoForecastAI** is a production-grade, **100% offline-first native Android application** (`Kotlin 2.0.21`, `Jetpack Compose Material 3`, `Room SQLite`, `CameraX 1.5.3`, `TensorFlow Lite 2.16.1`) built for cacao harvest forecasting and phytosanitary risk monitoring in the field.
+**CacauLens** is a production-grade, **100% offline-first native Android application** (`Kotlin 2.0.21`, `Jetpack Compose Material 3`, `Room SQLite`, `CameraX 1.5.3`, `TensorFlow Lite 2.16.1`) built for cacao harvest forecasting and phytosanitary risk monitoring in the field.
 
+- **Field-Ready Ergonomics &amp; Onboarding:** High-contrast solar design system (`tnum` tabular numerals, bordered cards, adaptive launcher icon), 3-step onboarding, interactive agronomic glossary (`NPT/FA/NPF`), one-tap clone/spacing presets, guided camera reticle with haptics, and accessible bounding-box tags (`S/PP/MO/VB`).
 - **Resilient Field Sampling (`1..NPF`):** Atomic per-plant persistence in SQLite (`IN_PROGRESS` → `COMPLETED`) allows instant session recovery after battery loss or OS process death, keeping temporary photos isolated in private storage and purging them upon completion.
 - **Dual On-Device Computer Vision Pipeline:** Dedicated single-thread executor (`cacao-ml-worker`) with a shared `640×640` `DirectByteBuffer` executing `detector.tflite` (fruit counting) and `detector_doenca.tflite` (`PodridaoParda`, `Moniliase`, `Sadio`, `VassouraBruxa`), plus morpho-colorimetric refinement and `IoU >= 0.20` fusion.
 - **Agronomic Math &amp; Historical Snapshots:** Computes both **Gross Biological Potential (`NFT`)** and **Net Marketable Harvest (`NFS`)**, prevents `NaN` on zero-fruit off-season plots, deduplicates intra-month evaluations per plot, freezes historical plot parameters (`snapshot_*`), and flags quarantine alerts upon any `Monilíase` detection.
 - **Reporting, Calibration &amp; Backup:** Native multi-page `PdfDocument` generator with mandatory disclaimer footer and one-tap WhatsApp sharing (`FileProvider`), Excel-ready `.csv` research export (UTF-8 BOM), post-harvest `Estimated vs. Real (@)` cumulative chart, and integrity-checked SQLite backup/restore (`PRAGMA wal_checkpoint(FULL)` + `PRAGMA integrity_check` + automatic rollback).
-- **Verified Quality:** **51 JVM + Robolectric unit tests across 12 suites** running automatically on GitHub Actions (`Android CI`).
+- **Verified Quality:** **53 JVM + Robolectric unit tests across 13 suites** running automatically on GitHub Actions (`Android CI`).
 
 </details>
 
@@ -56,11 +57,11 @@ flowchart TD
 - **Persistência & ML:** Room `2.6.1`, CameraX `1.5.3`, TensorFlow Lite `2.16.1`, ExifInterface `1.3.7`
 - **Testes:** JUnit 4, Kotlinx Coroutines Test `1.9.0`, Robolectric `4.14.1`, Room Testing
 
-## Suíte de Testes Automatizados (51 Testes em 12 Suítes)
+## Suíte de Testes Automatizados (53 Testes em 13 Suítes)
 
 | Camada | Suítes | Cobertura Principal |
 | :--- | :---: | :--- |
-| **Domínio & Matemática** | 3 suítes (`22` testes) | Fórmulas `NFT`/`NFS`, guarda `NFT == 0`, ponderação consolidada, ordenações e curva cumulativa (`Estimada vs. Real`) |
+| **Domínio & Matemática** | 4 suítes (`24` testes) | Fórmulas `NFT`/`NFS`, guarda `NFT == 0`, ponderação consolidada, curva cumulativa e presets agronômicos |
 | **Room & Backup SQLite** | 2 suítes (`9` testes) | Snapshot histórico imutável, isolamento `IN_PROGRESS`, deduplicação mensal, soft delete, WAL checkpoint e rollback |
 | **Visão Computacional & ML** | 3 suítes (`10` testes) | Decodificação YOLO `[1,5,8400]` / `[1,8,8400]`, NMS, fusão IoU `0.20`, heurística CEPEC, EXIF e headers `TFL3` |
 | **ViewModels, PDF & CSV** | 4 suítes (`10` testes) | Sessão `1..NPF`, seletor das 3 doenças, CRUD/filtros, paginação PDF multi-página, alerta Monilíase, exportação `.csv` e WhatsApp |

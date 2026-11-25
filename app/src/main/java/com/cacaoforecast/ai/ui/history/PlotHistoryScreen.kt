@@ -43,6 +43,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cacaoforecast.ai.domain.model.DiseaseSeverity
 import com.cacaoforecast.ai.domain.model.EvaluationSummary
+import com.cacaoforecast.ai.ui.components.BrandTopAppBar
+import com.cacaoforecast.ai.ui.components.SeverityPill
+import com.cacaoforecast.ai.ui.components.SolarCard
 import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalRed
@@ -73,29 +76,10 @@ fun PlotHistoryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Histórico & Produção Real", fontWeight = FontWeight.Bold)
-                        plot?.nome?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
-                            )
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+            BrandTopAppBar(
+                title = "Histórico & Produção Real",
+                subtitle = plot?.nome,
+                onBack = onBack
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -132,9 +116,8 @@ fun PlotHistoryScreen(
                         DiseaseSeverity.WARNING -> SeverityWarningAmber
                         DiseaseSeverity.CRITICAL -> SeverityCriticalRed
                     }
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    SolarCard(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
@@ -151,11 +134,7 @@ fun PlotHistoryScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = String.format(ptBr, "Perdas: %.1f%%", eval.perdasPct),
-                                        color = sevColor,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    SeverityPill(severity = eval.severity, lossPct = eval.perdasPct)
                                     lossDelta?.let { delta ->
                                         val deltaColor = if (delta <= 0.0) SeverityControlledGreen else SeverityCriticalRed
                                         Text(

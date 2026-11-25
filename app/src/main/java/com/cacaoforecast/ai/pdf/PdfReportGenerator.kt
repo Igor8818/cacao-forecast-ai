@@ -9,6 +9,7 @@ import com.cacaoforecast.ai.domain.model.DiseaseSeverity
 import com.cacaoforecast.ai.domain.model.DominantDisease
 import com.cacaoforecast.ai.domain.model.FarmReportUiModel
 import com.cacaoforecast.ai.domain.model.ProductionBasis
+import com.cacaoforecast.ai.ui.theme.BrandIdentity
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -112,7 +113,7 @@ class PdfReportGenerator(private val context: Context) {
             .replace(Regex("[^a-z0-9]+"), "_")
             .trim('_')
             .ifEmpty { "fazenda" }
-        val fileName = "relatorio_${slug}_${System.currentTimeMillis()}.pdf"
+        val fileName = "${BrandIdentity.FILE_PREFIX}_${slug}_${System.currentTimeMillis()}.pdf"
         val outFile = File(reportsDir, fileName)
 
         val ptBr = Locale("pt", "BR")
@@ -186,7 +187,7 @@ class PdfReportGenerator(private val context: Context) {
 
                 var y = 36f
                 if (slice.pageIndex == 0) {
-                    canvas.drawText("CacaoForecastAI • Relatório Consolidado de Safra", MARGIN_X, y, titlePaint)
+                    canvas.drawText(BrandIdentity.PDF_TITLE, MARGIN_X, y, titlePaint)
                     y += 18f
                     val locationPart = report.farm.municipioUf?.let { " • $it" } ?: ""
                     val ownerPart = report.farm.proprietario?.let { " • Resp.: $it" } ?: ""

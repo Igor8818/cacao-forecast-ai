@@ -13,6 +13,7 @@ import com.cacaoforecast.ai.domain.model.ReportSortOrder
 import com.cacaoforecast.ai.domain.repository.CacaoRepository
 import com.cacaoforecast.ai.pdf.CsvReportExporter
 import com.cacaoforecast.ai.pdf.PdfReportGenerator
+import com.cacaoforecast.ai.ui.theme.BrandIdentity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -158,7 +159,7 @@ class FarmReportViewModel(
             }
             _isGeneratingPdf.value = false
             res.onSuccess { file ->
-                val caption = "Relatório CacaoForecastAI • ${currentReport.farm.nome} (${currentReport.periodLabel})"
+                val caption = "Relatório ${BrandIdentity.NAME} • ${currentReport.farm.nome} (${currentReport.periodLabel})"
                 onGenerated(file, caption)
             }.onFailure { err ->
                 _message.value = err.message ?: "Erro ao gerar PDF."
@@ -179,7 +180,7 @@ class FarmReportViewModel(
             }
             _isGeneratingPdf.value = false
             res.onSuccess { file ->
-                val caption = "Planilha CSV CacaoForecastAI • ${currentReport.farm.nome} (${currentReport.periodLabel})"
+                val caption = "Planilha CSV ${BrandIdentity.NAME} • ${currentReport.farm.nome} (${currentReport.periodLabel})"
                 onGenerated(file, caption)
             }.onFailure { err ->
                 _message.value = err.message ?: "Erro ao exportar CSV."

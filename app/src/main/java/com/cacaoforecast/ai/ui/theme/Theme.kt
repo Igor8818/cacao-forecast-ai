@@ -30,6 +30,7 @@ fun CacaoForecastTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = LightColorScheme,
         typography = CacaoTypography,
+        shapes = CacaoShapes,
         content = content
     )
 }

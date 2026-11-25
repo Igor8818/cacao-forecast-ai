@@ -1,6 +1,7 @@
 package com.cacaoforecast.ai.ui.reports
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,8 +22,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -56,8 +55,13 @@ import com.cacaoforecast.ai.domain.model.FarmReportUiModel
 import com.cacaoforecast.ai.domain.model.Plot
 import com.cacaoforecast.ai.domain.model.ProductionBasis
 import com.cacaoforecast.ai.domain.model.ReportSortOrder
+import com.cacaoforecast.ai.ui.components.KpiStatCard
+import com.cacaoforecast.ai.ui.components.SeverityPill
+import com.cacaoforecast.ai.ui.components.SolarCard
 import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
-import com.cacaoforecast.ai.ui.theme.SeverityControlledBg
+import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
+import com.cacaoforecast.ai.ui.theme.CacaoGoldAccent
+import com.cacaoforecast.ai.ui.theme.CacaoZebraRow
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalBg
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalRed
@@ -80,6 +84,7 @@ fun TabularReportContent(
     onSelectPeriod: (Long, Long, String) -> Unit,
     onSelectBasis: (ProductionBasis) -> Unit,
     onSelectSortOrder: (ReportSortOrder) -> Unit,
+    onOpenPlotHistory: (Long, Long) -> Unit,
     onShareWhatsApp: () -> Unit,
     onShareGenericPdf: () -> Unit,
     onExportCsv: () -> Unit,
@@ -92,18 +97,26 @@ fun TabularReportContent(
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text("Nenhuma fazenda cadastrada", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    "Cadastre uma fazenda e realize amostragens para gerar relatórios consolidados.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Button(onClick = onNavigateToFarms, modifier = Modifier.height(52.dp)) {
-                    Text("Cadastrar Fazenda")
+            SolarCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("Nenhuma fazenda cadastrada", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Cadastre uma fazenda e realize amostragens para gerar relatórios consolidados.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = onNavigateToFarms,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        Text("Cadastrar Fazenda")
+                    }
                 }
             }
         }
@@ -116,7 +129,7 @@ fun TabularReportContent(
 
     val selectedFarm = report?.farm ?: farms.first()
     val selectedPlotName = plots.find { it.id == filters.selectedPlotId }?.nome ?: "Todas as Quadras"
-    val ptBr = Locale("pt", "BR")
+    val ptBr = remember { Locale("pt", "BR") }
     val dayMonthFmt = remember { SimpleDateFormat("dd/MM", ptBr) }
 
     Column(
@@ -164,7 +177,9 @@ fun TabularReportContent(
         ) {
             OutlinedButton(
                 onClick = { showPeriodDialog = true },
-                modifier = Modifier.weight(1f).height(54.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .height(54.dp)
             ) {
                 Icon(Icons.Default.CalendarMonth, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
@@ -230,10 +245,7 @@ fun TabularReportContent(
         }
 
         if (report == null || report.rows.isEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            SolarCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -251,11 +263,47 @@ fun TabularReportContent(
                 }
             }
         } else {
+            val f = report.footer
+            val totalLossColor = when (f.severity) {
+                DiseaseSeverity.CRITICAL -> SeverityCriticalRed
+                DiseaseSeverity.WARNING -> SeverityWarningAmber
+                DiseaseSeverity.CONTROLLED -> SeverityControlledGreen
+            }
+
+            // Faixa de 3 KPIs Executivos
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                KpiStatCard(
+                    label = if (report.basis == ProductionBasis.NET_HEALTHY_NFS) "Safra Líquida" else "Potencial Bruto",
+                    value = String.format(ptBr, "%.1f @", f.totalProducaoExibidaArrobas),
+                    subtitle = "${f.totalPlotsEvaluated} de ${f.totalActivePlotsInFarm} roças",
+                    accentColor = CacaoForestPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+                KpiStatCard(
+                    label = "Produtividade",
+                    value = String.format(ptBr, "%.1f @/ha", f.produtividadeConsolidadaPorHa),
+                    subtitle = String.format(ptBr, "%.2f ha aval.", f.totalAreaHa),
+                    accentColor = CacaoGoldAccent,
+                    modifier = Modifier.weight(1f)
+                )
+                KpiStatCard(
+                    label = "Perda Ponderada",
+                    value = String.format(ptBr, "%.1f%%", f.perdasPonderadasPct),
+                    subtitle = String.format(ptBr, "-%.1f @ perdidas", f.totalPerdaArrobas),
+                    accentColor = totalLossColor,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
             // Card de Alerta Quarentenário de Monilíase (>= 1 fruto detectado)
-            if (report.footer.totalMoniliaseFruits > 0) {
-                Card(
+            if (f.totalMoniliaseFruits > 0) {
+                SolarCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = BoxMoniliaseColor.copy(alpha = 0.12f))
+                    containerColor = BoxMoniliaseColor.copy(alpha = 0.12f),
+                    borderColor = BoxMoniliaseColor.copy(alpha = 0.5f)
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
@@ -269,13 +317,13 @@ fun TabularReportContent(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "ALERTA QUARENTENÁRIO — Monilíase (${report.footer.totalMoniliaseFruits} fruto(s))",
+                                text = "ALERTA QUARENTENÁRIO — Monilíase (${f.totalMoniliaseFruits} fruto(s))",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = BoxMoniliaseColor
                             )
                             Text(
-                                text = "Roças afetadas: ${report.footer.moniliaseAlertPlotNames.joinToString(", ")}. Isolar área e acionar assistência técnica CEPLAC.",
+                                text = "Roças afetadas: ${f.moniliaseAlertPlotNames.joinToString(", ")}. Isolar área e acionar assistência técnica CEPLAC.",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -285,9 +333,10 @@ fun TabularReportContent(
 
             // Card de Destaque Fitossanitário
             report.criticalHighlightRow?.let { crit ->
-                Card(
+                SolarCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = SeverityCriticalBg)
+                    containerColor = SeverityCriticalBg,
+                    borderColor = SeverityCriticalRed.copy(alpha = 0.45f)
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
@@ -312,8 +361,8 @@ fun TabularReportContent(
                                 color = SeverityCriticalRed
                             )
                             Text(
-                                text = "Predomínio: ${dominantDiseaseLabel(crit.dominantDisease)}",
-                                style = MaterialTheme.typography.bodyMedium
+                                text = "Predomínio: ${dominantDiseaseLabel(crit.dominantDisease)} • Toque na linha abaixo para abrir o histórico",
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
                     }
@@ -342,9 +391,15 @@ fun TabularReportContent(
                 )
             }
 
+            Text(
+                text = "↔ Deslize lateralmente na tabela • Toque em uma roça para ver histórico",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             // Tabela de 6 colunas oficiais + Rodapé Consolidado
             val hScroll = rememberScrollState()
-            Card(modifier = Modifier.fillMaxWidth()) {
+            SolarCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -363,34 +418,30 @@ fun TabularReportContent(
                             .padding(vertical = 10.dp, horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TableCell("Roça", 150.dp, Color.White, FontWeight.Bold, TextAlign.Start)
+                        TableCell("Roça", 156.dp, Color.White, FontWeight.Bold, TextAlign.Start)
                         TableCell("Área (ha)", 76.dp, Color.White, FontWeight.Bold)
                         TableCell("Npla", 70.dp, Color.White, FontWeight.Bold)
                         TableCell(basisHeader, 96.dp, Color.White, FontWeight.Bold)
                         TableCell("Produt. (@/ha)", 100.dp, Color.White, FontWeight.Bold)
-                        TableCell("Perdas (%)", 84.dp, Color.White, FontWeight.Bold)
+                        TableCell("Perdas (%)", 132.dp, Color.White, FontWeight.Bold)
                     }
 
-                    report.rows.forEach { row ->
+                    report.rows.forEachIndexed { idx, row ->
                         val rowBg = when (row.severity) {
                             DiseaseSeverity.CRITICAL -> SeverityCriticalBg
                             DiseaseSeverity.WARNING -> SeverityWarningBg
-                            DiseaseSeverity.CONTROLLED -> Color.Transparent
-                        }
-                        val lossColor = when (row.severity) {
-                            DiseaseSeverity.CRITICAL -> SeverityCriticalRed
-                            DiseaseSeverity.WARNING -> SeverityWarningAmber
-                            DiseaseSeverity.CONTROLLED -> SeverityControlledGreen
+                            DiseaseSeverity.CONTROLLED -> if (idx % 2 == 1) CacaoZebraRow else Color.Transparent
                         }
                         val weight = if (row.severity == DiseaseSeverity.CRITICAL) FontWeight.Bold else FontWeight.Normal
 
                         Row(
                             modifier = Modifier
                                 .background(rowBg)
+                                .clickable { onOpenPlotHistory(report.farm.id, row.plotId) }
                                 .padding(vertical = 10.dp, horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.width(150.dp)) {
+                            Column(modifier = Modifier.width(156.dp)) {
                                 Text(
                                     text = row.plotName,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -408,38 +459,42 @@ fun TabularReportContent(
                             TableCell(row.npt.toString(), 70.dp, MaterialTheme.colorScheme.onSurface, weight)
                             TableCell(String.format(ptBr, "%.1f", row.producaoExibidaArrobas), 96.dp, MaterialTheme.colorScheme.onSurface, weight)
                             TableCell(String.format(ptBr, "%.1f", row.produtividadeExibidaPorHa), 100.dp, MaterialTheme.colorScheme.onSurface, weight)
-                            TableCell(String.format(ptBr, "%.1f%%", row.perdasPct), 84.dp, lossColor, FontWeight.Bold)
+                            Box(
+                                modifier = Modifier.width(132.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                SeverityPill(severity = row.severity, lossPct = row.perdasPct)
+                            }
                         }
                         HorizontalDivider()
                     }
 
                     // Rodapé fixo Total / Consolidado da Fazenda
-                    val f = report.footer
                     Row(
                         modifier = Modifier
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(vertical = 12.dp, horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TableCell("TOTAL FAZENDA", 150.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold, TextAlign.Start)
+                        TableCell("TOTAL FAZENDA", 156.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold, TextAlign.Start)
                         TableCell(String.format(ptBr, "%.2f", f.totalAreaHa), 76.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
                         TableCell(f.totalNpt.toString(), 70.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
                         TableCell(String.format(ptBr, "%.1f", f.totalProducaoExibidaArrobas), 96.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
                         TableCell(String.format(ptBr, "%.1f", f.produtividadeConsolidadaPorHa), 100.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
-                        val totalLossColor = when (f.severity) {
-                            DiseaseSeverity.CRITICAL -> SeverityCriticalRed
-                            DiseaseSeverity.WARNING -> SeverityWarningAmber
-                            DiseaseSeverity.CONTROLLED -> SeverityControlledGreen
+                        Box(
+                            modifier = Modifier.width(132.dp),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            SeverityPill(severity = f.severity, lossPct = f.perdasPonderadasPct)
                         }
-                        TableCell(String.format(ptBr, "%.1f%%", f.perdasPonderadasPct), 84.dp, totalLossColor, FontWeight.Bold)
                     }
                 }
             }
 
-            val coverageText = if (report.footer.pendingPlotNames.isEmpty()) {
-                "Cobertura: ${report.footer.totalPlotsEvaluated} de ${report.footer.totalActivePlotsInFarm} roças avaliadas no período."
+            val coverageText = if (f.pendingPlotNames.isEmpty()) {
+                "Cobertura: ${f.totalPlotsEvaluated} de ${f.totalActivePlotsInFarm} roças avaliadas no período."
             } else {
-                "Cobertura: ${report.footer.totalPlotsEvaluated} de ${report.footer.totalActivePlotsInFarm} roças avaliadas (Pendentes: ${report.footer.pendingPlotNames.joinToString(", ")})"
+                "Cobertura: ${f.totalPlotsEvaluated} de ${f.totalActivePlotsInFarm} roças avaliadas (Pendentes: ${f.pendingPlotNames.joinToString(", ")})"
             }
             Text(
                 text = coverageText,
@@ -447,33 +502,44 @@ fun TabularReportContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            // Botões de PDF
+            // Barra limpa de Exportação
             Button(
                 onClick = onShareWhatsApp,
                 enabled = !isGeneratingPdf && report.rows.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(54.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
             ) {
                 Icon(Icons.Default.PictureAsPdf, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Enviar PDF no WhatsApp")
+                Text("Enviar Relatório PDF no WhatsApp")
             }
-            OutlinedButton(
-                onClick = onShareGenericPdf,
-                enabled = !isGeneratingPdf && report.rows.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(52.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Share, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Compartilhar / Salvar PDF")
-            }
-            OutlinedButton(
-                onClick = onExportCsv,
-                enabled = !isGeneratingPdf && report.rows.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(52.dp)
-            ) {
-                Icon(Icons.Default.TableChart, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Exportar Planilha (.csv)")
+                OutlinedButton(
+                    onClick = onShareGenericPdf,
+                    enabled = !isGeneratingPdf && report.rows.isNotEmpty(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Salvar PDF", maxLines = 1)
+                }
+                OutlinedButton(
+                    onClick = onExportCsv,
+                    enabled = !isGeneratingPdf && report.rows.isNotEmpty(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp)
+                ) {
+                    Icon(Icons.Default.TableChart, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Planilha (.csv)", maxLines = 1)
+                }
             }
         }
     }
@@ -499,7 +565,9 @@ private fun TableCell(
 ) {
     Text(
         text = text,
-        modifier = Modifier.width(width).padding(horizontal = 4.dp),
+        modifier = Modifier
+            .width(width)
+            .padding(horizontal = 4.dp),
         color = color,
         fontWeight = fontWeight,
         style = MaterialTheme.typography.bodyMedium,

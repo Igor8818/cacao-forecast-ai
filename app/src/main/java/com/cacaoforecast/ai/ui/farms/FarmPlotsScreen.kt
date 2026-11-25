@@ -3,6 +3,8 @@ package com.cacaoforecast.ai.ui.farms
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,18 +15,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,10 +33,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,9 +48,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cacaoforecast.ai.domain.model.Plot
+import com.cacaoforecast.ai.ui.components.BrandTopAppBar
+import com.cacaoforecast.ai.ui.components.GlossaryHelpSheet
+import com.cacaoforecast.ai.ui.components.KpiStatCard
+import com.cacaoforecast.ai.ui.components.SolarCard
+import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
+import com.cacaoforecast.ai.ui.theme.CacaoPodSecondary
+import com.cacaoforecast.ai.ui.theme.CacaoSurfaceVariant
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FarmPlotsScreen(
     farmId: Long,
@@ -64,10 +70,12 @@ fun FarmPlotsScreen(
     val plots by remember(farmId) { viewModel.observePlots(farmId) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val ptBr = remember { Locale("pt", "BR") }
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var editingPlot by remember { mutableStateOf<Plot?>(null) }
     var plotToArchive by remember { mutableStateOf<Plot?>(null) }
+    var showGlossary by remember { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         val current = message ?: return@LaunchedEffect
@@ -77,32 +85,15 @@ fun FarmPlotsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Roças / Quadras", fontWeight = FontWeight.Bold)
-                        farm?.nome?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
-                            )
-                        }
+            BrandTopAppBar(
+                title = "Roças / Quadras",
+                subtitle = farm?.nome,
+                onBack = onBack,
+                actions = {
+                    IconButton(onClick = { showGlossary = true }) {
+                        Icon(Icons.Default.HelpOutline, contentDescription = "Guia Rápido")
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Voltar"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                }
             )
         },
         floatingActionButton = {
@@ -126,30 +117,39 @@ fun FarmPlotsScreen(
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Nenhuma Roça / Quadra cadastrada",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Text(
-                        text = "Informe Área (A), Total de Plantas (NPT), Frutos/@ (FA) e Meta de Fotos (NPF).",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Button(
-                        onClick = { showCreateDialog = true },
-                        modifier = Modifier.height(52.dp)
+                SolarCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Adicionar Roça / Quadra")
+                        Text(
+                            text = "Divida a fazenda em Roças / Quadras",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Cada roça possui sua própria Área (ha), Total de Plantas (NPT), Frutos/@ (FA) e Meta de Fotos (NPF). Use nossos presets prontos de clone e espaçamento!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = { showCreateDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Adicionar Roça / Quadra")
+                        }
                     }
                 }
             }
         } else {
+            val totalArea = plots.sumOf { it.areaHa }
+            val totalNpt = plots.sumOf { it.npt }
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -157,12 +157,36 @@ fun FarmPlotsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(plots, key = { it.id }) { plot ->
-                    Card(
+                item {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        KpiStatCard(
+                            label = "Áreas Ativas",
+                            value = "${plots.size}",
+                            subtitle = "roça(s)",
+                            modifier = Modifier.weight(1f)
+                        )
+                        KpiStatCard(
+                            label = "Área Total",
+                            value = String.format(ptBr, "%.2f ha", totalArea),
+                            subtitle = "cadastrados",
+                            accentColor = CacaoPodSecondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        KpiStatCard(
+                            label = "Cacaueiros",
+                            value = "$totalNpt",
+                            subtitle = "plantas",
+                            accentColor = CacaoForestPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                items(plots, key = { it.id }) { plot ->
+                    SolarCard(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -176,18 +200,6 @@ fun FarmPlotsScreen(
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Text(
-                                        text = String.format(
-                                            Locale("pt", "BR"),
-                                            "%.2f ha • %d plantas • FA %.0f frutos/@ • Meta: %d fotos",
-                                            plot.areaHa,
-                                            plot.npt,
-                                            plot.fa,
-                                            plot.npf
-                                        ),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
                                 }
                                 IconButton(onClick = { editingPlot = plot }) {
                                     Icon(Icons.Default.Edit, contentDescription = "Editar Roça / Quadra")
@@ -200,6 +212,17 @@ fun FarmPlotsScreen(
                                     )
                                 }
                             }
+
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                ParamPill(String.format(ptBr, "%.2f ha", plot.areaHa))
+                                ParamPill("${plot.npt} pés")
+                                ParamPill(String.format(ptBr, "FA %.0f", plot.fa))
+                                ParamPill("Meta: ${plot.npf} fotos")
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -208,21 +231,21 @@ fun FarmPlotsScreen(
                                     onClick = { onStartSampling(farmId, plot.id) },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(52.dp)
+                                        .height(50.dp)
                                 ) {
                                     Icon(Icons.Default.CameraAlt, contentDescription = null)
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Amostrar")
+                                    Text("Amostrar", maxLines = 1)
                                 }
                                 OutlinedButton(
                                     onClick = { onOpenHistory(farmId, plot.id) },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(52.dp)
+                                        .height(50.dp)
                                 ) {
                                     Icon(Icons.Default.History, contentDescription = null)
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Histórico / Prod. Real")
+                                    Text("Histórico", maxLines = 1)
                                 }
                             }
                         }
@@ -230,6 +253,10 @@ fun FarmPlotsScreen(
                 }
             }
         }
+    }
+
+    if (showGlossary) {
+        GlossaryHelpSheet(onDismiss = { showGlossary = false })
     }
 
     if (showCreateDialog || editingPlot != null) {
@@ -271,6 +298,22 @@ fun FarmPlotsScreen(
                     Text("Cancelar")
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun ParamPill(text: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = CacaoSurfaceVariant
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

@@ -17,17 +17,12 @@ import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,11 +31,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cacaoforecast.ai.ui.components.BrandTopAppBar
+import com.cacaoforecast.ai.ui.components.KpiStatCard
+import com.cacaoforecast.ai.ui.components.SeverityPill
+import com.cacaoforecast.ai.ui.components.SolarCard
 import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
+import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
+import com.cacaoforecast.ai.ui.theme.CacaoPodSecondary
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SamplingSummaryScreen(
     evaluationId: Long,
@@ -58,18 +58,17 @@ fun SamplingSummaryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Avaliação Concluída", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+            BrandTopAppBar(
+                title = "Avaliação Concluída",
+                subtitle = summary?.snapshotPlotName
             )
         }
     ) { innerPadding ->
         if (summary == null) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
@@ -84,71 +83,73 @@ fun SamplingSummaryScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = SeverityControlledGreen
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = SeverityControlledGreen
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${summary.snapshotPlotName} salva offline",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    SeverityPill(severity = summary.severity, lossPct = summary.perdasPct)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    KpiStatCard(
+                        label = "Líquida (NFS)",
+                        value = String.format(ptBr, "%.1f @", summary.producaoLiquidaArrobas),
+                        subtitle = String.format(ptBr, "%.1f @/ha", summary.produtividadeLiquidaPorHa),
+                        accentColor = CacaoForestPrimary,
+                        modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${summary.snapshotPlotName} selada no banco offline",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                    KpiStatCard(
+                        label = "Bruta (NFT)",
+                        value = String.format(ptBr, "%.1f @", summary.producaoBrutaArrobas),
+                        subtitle = String.format(ptBr, "%.1f @/ha", summary.produtividadeBrutaPorHa),
+                        accentColor = CacaoPodSecondary,
+                        modifier = Modifier.weight(1f)
                     )
                 }
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
+                SolarCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = String.format(
-                                ptBr,
-                                "Produção Líquida (NFS): %.1f @ (%.1f @/ha)",
-                                summary.producaoLiquidaArrobas,
-                                summary.produtividadeLiquidaPorHa
-                            ),
+                            text = "Resumo Auditado (${summary.nPlantasAmostradas}/${summary.snapshotNpf} plantas)",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = String.format(
-                                ptBr,
-                                "Potencial Bruto (NFT): %.1f @ (%.1f @/ha)",
-                                summary.producaoBrutaArrobas,
-                                summary.produtividadeBrutaPorHa
-                            )
-                        )
-                        Text(
-                            text = String.format(ptBr, "Perdas Fitossanitárias: %.1f%%", summary.perdasPct),
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text("Resumo Auditado (${summary.nPlantasAmostradas}/${summary.snapshotNpf} plantas)", fontWeight = FontWeight.Bold)
                         Text("Frutos Sadios (NFS): ${summary.nfs}")
                         Text("Frutos Doentes (NFD): ${summary.nfd}")
-                        Text("• Podridão Parda: ${summary.nPodridao}")
-                        Text("• Monilíase: ${summary.nMoniliase}")
-                        Text("• Vassoura de Bruxa: ${summary.nVassoura}")
+                        Text("• Podridão Parda: ${summary.nPodridao}", style = MaterialTheme.typography.bodySmall)
+                        Text("• Monilíase: ${summary.nMoniliase}", style = MaterialTheme.typography.bodySmall)
+                        Text("• Vassoura de Bruxa: ${summary.nVassoura}", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
                 if (summary.nMoniliase > 0) {
-                    Card(
+                    SolarCard(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = BoxMoniliaseColor.copy(alpha = 0.12f))
+                        containerColor = BoxMoniliaseColor.copy(alpha = 0.12f),
+                        borderColor = BoxMoniliaseColor.copy(alpha = 0.5f)
                     ) {
                         Row(
                             modifier = Modifier.padding(14.dp),
@@ -178,7 +179,9 @@ fun SamplingSummaryScreen(
 
                 Button(
                     onClick = onGoToReports,
-                    modifier = Modifier.fillMaxWidth().height(54.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
                 ) {
                     Icon(Icons.Default.Assessment, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -187,7 +190,9 @@ fun SamplingSummaryScreen(
 
                 OutlinedButton(
                     onClick = onDoneToSetup,
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
                 ) {
                     Text("Nova Amostragem")
                 }

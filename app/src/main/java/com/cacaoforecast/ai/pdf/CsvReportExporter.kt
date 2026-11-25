@@ -5,6 +5,7 @@ import com.cacaoforecast.ai.domain.model.DiseaseSeverity
 import com.cacaoforecast.ai.domain.model.DominantDisease
 import com.cacaoforecast.ai.domain.model.FarmReportUiModel
 import com.cacaoforecast.ai.domain.model.ProductionBasis
+import com.cacaoforecast.ai.ui.theme.BrandIdentity
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -107,7 +108,7 @@ class CsvReportExporter(private val context: Context) {
             .replace(Regex("[^a-z0-9]+"), "_")
             .trim('_')
             .ifEmpty { "fazenda" }
-        val file = File(reportsDir, "relatorio_${slug}_${System.currentTimeMillis()}.csv")
+        val file = File(reportsDir, "${BrandIdentity.FILE_PREFIX}_${slug}_${System.currentTimeMillis()}.csv")
         file.writeText(buildCsvContent(report), Charsets.UTF_8)
         file
     }

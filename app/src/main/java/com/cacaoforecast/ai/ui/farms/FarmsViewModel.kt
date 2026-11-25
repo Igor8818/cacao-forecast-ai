@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -29,6 +30,10 @@ class FarmsViewModel(
 
     fun observePlots(farmId: Long): Flow<List<Plot>> =
         repository.observeActivePlotsByFarm(farmId)
+
+    fun observeFarmPlotsSummary(farmId: Long): Flow<Pair<Int, Double>> =
+        repository.observeActivePlotsByFarm(farmId)
+            .map { list -> list.size to list.sumOf { it.areaHa } }
 
     fun saveFarm(farm: Farm, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {

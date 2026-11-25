@@ -7,6 +7,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Agriculture
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.outlined.Agriculture
+import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -83,23 +86,41 @@ fun CacaoNavGraph(appContainer: AppContainer) {
         Scaffold(
             bottomBar = {
                 if (showBottomBar) {
-                    NavigationBar(modifier = Modifier.height(72.dp)) {
+                    NavigationBar(modifier = Modifier.height(74.dp)) {
+                        val farmsSelected = currentRoute == Routes.FARMS_LIST
                         NavigationBarItem(
-                            selected = currentRoute == Routes.FARMS_LIST,
+                            selected = farmsSelected,
                             onClick = { navigateTopTab(Routes.FARMS_LIST) },
-                            icon = { Icon(Icons.Default.Agriculture, contentDescription = "Fazendas") },
+                            icon = {
+                                Icon(
+                                    if (farmsSelected) Icons.Filled.Agriculture else Icons.Outlined.Agriculture,
+                                    contentDescription = "Fazendas"
+                                )
+                            },
                             label = { Text("Fazendas") }
                         )
+                        val samplingSelected = currentRoute == Routes.SAMPLING_SETUP_PATTERN
                         NavigationBarItem(
-                            selected = currentRoute == Routes.SAMPLING_SETUP_PATTERN,
+                            selected = samplingSelected,
                             onClick = { navigateTopTab(Routes.samplingSetup()) },
-                            icon = { Icon(Icons.Default.CameraAlt, contentDescription = "Amostrar") },
+                            icon = {
+                                Icon(
+                                    if (samplingSelected) Icons.Filled.CameraAlt else Icons.Outlined.CameraAlt,
+                                    contentDescription = "Amostrar"
+                                )
+                            },
                             label = { Text("Amostrar") }
                         )
+                        val reportsSelected = currentRoute == Routes.REPORTS_HUB
                         NavigationBarItem(
-                            selected = currentRoute == Routes.REPORTS_HUB,
+                            selected = reportsSelected,
                             onClick = { navigateTopTab(Routes.REPORTS_HUB) },
-                            icon = { Icon(Icons.Default.Assessment, contentDescription = "Relatórios") },
+                            icon = {
+                                Icon(
+                                    if (reportsSelected) Icons.Filled.Assessment else Icons.Outlined.Assessment,
+                                    contentDescription = "Relatórios"
+                                )
+                            },
                             label = { Text("Relatórios") }
                         )
                     }

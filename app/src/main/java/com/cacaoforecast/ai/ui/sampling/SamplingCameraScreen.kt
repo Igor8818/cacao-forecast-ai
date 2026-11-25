@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlin.math.abs
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
@@ -72,6 +78,7 @@ fun SamplingCameraScreen(
     onExitToSetup: () -> Unit
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(evaluationId) {
@@ -223,6 +230,8 @@ fun SamplingCameraScreen(
                 onCameraError = { cameraError = it }
             )
 
+            FramingReticleOverlay(modifier = Modifier.fillMaxSize())
+
             // Cabeçalho fixo gigante k/NPF
             Surface(
                 color = Color.Black.copy(alpha = 0.72f),
@@ -297,10 +306,23 @@ fun SamplingCameraScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         listOf(1f, 2f, 3f).filter { it <= maxZoom + 0.1f }.forEach { level ->
-                            OutlinedButton(
-                                onClick = { zoomRatio = level.coerceAtMost(maxZoom) }
-                            ) {
-                                Text("${level.toInt()}x", color = Color.White)
+                            val isActiveZoom = abs(zoomRatio - level) < 0.35f
+                            if (isActiveZoom) {
+                                Button(
+                                    onClick = { zoomRatio = level.coerceAtMost(maxZoom) },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFF4B400),
+                                        contentColor = Color.Black
+                                    )
+                                ) {
+                                    Text("${level.toInt()}x", fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { zoomRatio = level.coerceAtMost(maxZoom) }
+                                ) {
+                                    Text("${level.toInt()}x", color = Color.White)
+                                }
                             }
                         }
                     }
@@ -324,6 +346,7 @@ fun SamplingCameraScreen(
                         Button(
                             onClick = {
                                 if (isCapturing) return@Button
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 isCapturing = true
                                 cameraError = null
                                 val file = viewModel.sessionPhotoFile(evaluationId, plantIndex)
@@ -390,5 +413,33 @@ fun SamplingCameraScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun FramingReticleOverlay(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width * 0.72f
+        val h = size.height * 0.44f
+        val left = (size.width - w) / 2f
+        val top = (size.height - h) / 2f
+        val right = left + w
+        val bottom = top + h
+        val arm = 36f
+        val stroke = 4f
+        val reticleColor = Color.White.copy(alpha = 0.55f)
+
+        // Canto superior esquerdo
+        drawLine(reticleColor, Offset(left, top), Offset(left + arm, top), stroke)
+        drawLine(reticleColor, Offset(left, top), Offset(left, top + arm), stroke)
+        // Canto superior direito
+        drawLine(reticleColor, Offset(right - arm, top), Offset(right, top), stroke)
+        drawLine(reticleColor, Offset(right, top), Offset(right, top + arm), stroke)
+        // Canto inferior esquerdo
+        drawLine(reticleColor, Offset(left, bottom - arm), Offset(left, bottom), stroke)
+        drawLine(reticleColor, Offset(left, bottom), Offset(left + arm, bottom), stroke)
+        // Canto inferior direito
+        drawLine(reticleColor, Offset(right - arm, bottom), Offset(right, bottom), stroke)
+        drawLine(reticleColor, Offset(right, bottom - arm), Offset(right, bottom), stroke)
     }
 }

@@ -18,11 +18,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -50,9 +54,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,9 +89,11 @@ fun PlantPhotoReviewScreen(
     onCompleted: (Long) -> Unit
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     var previewBitmap by remember(photoUriString) { mutableStateOf<Bitmap?>(null) }
+    var showBoxes by remember { mutableStateOf(true) }
 
     LaunchedEffect(evaluationId, plantIndex, photoUriString) {
         viewModel.analyzeCapturedPhoto(evaluationId, plantIndex, photoUriString)
@@ -114,9 +124,18 @@ fun PlantPhotoReviewScreen(
                         fontWeight = FontWeight.Bold
                     )
                 },
+                actions = {
+                    IconButton(onClick = { showBoxes = !showBoxes }) {
+                        Icon(
+                            imageVector = if (showBoxes) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (showBoxes) "Ocultar caixas" else "Mostrar caixas"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }
@@ -142,12 +161,17 @@ fun PlantPhotoReviewScreen(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize()
                     )
-                    DetectionOverlayCanvas(
-                        boxes = uiState.detectedBoxes,
-                        imageWidth = bmp.width.toFloat(),
-                        imageHeight = bmp.height.toFloat(),
-                        onBoxTap = { boxId -> viewModel.cycleDetectedBox(boxId) }
-                    )
+                    if (showBoxes) {
+                        DetectionOverlayCanvas(
+                            boxes = uiState.detectedBoxes,
+                            imageWidth = bmp.width.toFloat(),
+                            imageHeight = bmp.height.toFloat(),
+                            onBoxTap = { boxId ->
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                viewModel.cycleDetectedBox(boxId)
+                            }
+                        )
+                    }
                 }
 
                 if (uiState.isAnalyzingPhoto) {
@@ -173,11 +197,18 @@ fun PlantPhotoReviewScreen(
             }
 
             // Painel de ajuste rápido NFS / NFD
+            Surface(
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                tonalElevation = 4.dp,
+                shadowElevation = 6.dp,
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.fillMaxWidth()
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = "Toque na caixa para ciclar (Sadio → P. Parda → Monil. → Vassoura → Remover) ou ajuste abaixo:",
@@ -300,6 +331,7 @@ fun PlantPhotoReviewScreen(
                     }
                 }
             }
+            }
         }
     }
 }
@@ -408,6 +440,15 @@ private fun DetectionOverlayCanvas(
     imageHeight: Float,
     onBoxTap: (String) -> Unit
 ) {
+    val tagPaint = remember {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = 26f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        }
+    }
+    val tagBgPaint = remember { android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG) }
+
     Canvas(
         modifier = Modifier
             .fillMaxSize()
@@ -438,22 +479,32 @@ private fun DetectionOverlayCanvas(
         val offsetY = (size.height - drawnH) / 2f
 
         boxes.forEach { box ->
-            val color = when (box.category) {
-                FruitHealthCategory.SADIO -> BoxHealthyColor
-                FruitHealthCategory.PODRIDAO_PARDA -> BoxPodridaoColor
-                FruitHealthCategory.MONILIASE -> BoxMoniliaseColor
-                FruitHealthCategory.VASSOURA_BRUXA -> BoxVassouraColor
+            val (color, tag) = when (box.category) {
+                FruitHealthCategory.SADIO -> BoxHealthyColor to "S"
+                FruitHealthCategory.PODRIDAO_PARDA -> BoxPodridaoColor to "PP"
+                FruitHealthCategory.MONILIASE -> BoxMoniliaseColor to "MO"
+                FruitHealthCategory.VASSOURA_BRUXA -> BoxVassouraColor to "VB"
             }
             val left = offsetX + box.normLeft * drawnW
             val top = offsetY + box.normTop * drawnH
             val boxW = (box.normRight - box.normLeft) * drawnW
             val boxH = (box.normBottom - box.normTop) * drawnH
             drawRect(
+                color = color.copy(alpha = 0.14f),
+                topLeft = Offset(left, top),
+                size = Size(boxW, boxH)
+            )
+            drawRect(
                 color = color,
                 topLeft = Offset(left, top),
                 size = Size(boxW, boxH),
-                style = Stroke(width = 3.dp.toPx())
+                style = Stroke(width = 2.5.dp.toPx())
             )
+            tagBgPaint.color = color.toArgb()
+            val tagW = tagPaint.measureText(tag) + 12f
+            val tagTop = (top - 30f).coerceAtLeast(offsetY)
+            drawContext.canvas.nativeCanvas.drawRect(left, tagTop, left + tagW, tagTop + 30f, tagBgPaint)
+            drawContext.canvas.nativeCanvas.drawText(tag, left + 6f, tagTop + 23f, tagPaint)
         }
     }
 }

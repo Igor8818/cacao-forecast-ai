@@ -44,6 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cacaoforecast.ai.pdf.ReportShareHelper
+import com.cacaoforecast.ai.ui.components.BrandTopAppBar
+import com.cacaoforecast.ai.ui.components.SolarCard
+import com.cacaoforecast.ai.ui.theme.BrandIdentity
 import com.cacaoforecast.ai.ui.theme.SeverityControlledBg
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalBg
 import java.text.SimpleDateFormat
@@ -78,18 +81,10 @@ fun BackupRestoreScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Backup & Restauração SQLite", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+            BrandTopAppBar(
+                title = "Backup & Restauração SQLite",
+                subtitle = BrandIdentity.NAME,
+                onBack = onBack
             )
         }
     ) { innerPadding ->
@@ -141,7 +136,7 @@ fun BackupRestoreScreen(
             Button(
                 onClick = {
                     val stamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
-                    exportLauncher.launch("cacao_forecast_$stamp.db")
+                    exportLauncher.launch("${BrandIdentity.FILE_PREFIX}_backup_$stamp.db")
                 },
                 enabled = !uiState.isBusy,
                 modifier = Modifier.fillMaxWidth().height(54.dp)

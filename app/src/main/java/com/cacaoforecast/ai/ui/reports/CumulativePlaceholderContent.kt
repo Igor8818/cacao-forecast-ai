@@ -58,8 +58,11 @@ import com.cacaoforecast.ai.domain.model.CumulativePlotReport
 import com.cacaoforecast.ai.domain.model.Farm
 import com.cacaoforecast.ai.domain.model.Plot
 import com.cacaoforecast.ai.domain.model.ProductionBasis
+import com.cacaoforecast.ai.ui.components.KpiStatCard
+import com.cacaoforecast.ai.ui.components.SolarCard
 import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
 import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
+import com.cacaoforecast.ai.ui.theme.CacaoGoldAccent
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalRed
 import com.cacaoforecast.ai.ui.theme.SeverityWarningAmber
@@ -210,13 +213,14 @@ fun CumulativePlaceholderContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MetricSummaryCard(
+                KpiStatCard(
                     title = "Total Estimado",
                     value = String.format(ptBr, "%.1f @", cumulativeReport.totalEstimadaArrobas),
                     subtitle = "${cumulativeReport.points.size} aval.",
+                    accentColor = CacaoForestPrimary,
                     modifier = Modifier.weight(1f)
                 )
-                MetricSummaryCard(
+                KpiStatCard(
                     title = "Total Real",
                     value = if (cumulativeReport.evaluationsWithRealCount > 0) {
                         String.format(ptBr, "%.1f @", cumulativeReport.totalRealArrobas)
@@ -224,20 +228,22 @@ fun CumulativePlaceholderContent(
                         "—"
                     },
                     subtitle = "${cumulativeReport.evaluationsWithRealCount} lançada(s)",
+                    accentColor = CacaoGoldAccent,
                     modifier = Modifier.weight(1f)
                 )
-                MetricSummaryCard(
+                KpiStatCard(
                     title = "Erro Médio",
                     value = cumulativeReport.meanRelativeErrorPct?.let {
                         String.format(ptBr, "%.1f%%", it)
                     } ?: "Sem real",
                     subtitle = "vs. colhido",
+                    accentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
             }
 
             // Gráfico Temporal Estimada vs. Real
-            Card(modifier = Modifier.fillMaxWidth()) {
+            SolarCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -267,7 +273,7 @@ fun CumulativePlaceholderContent(
             }
 
             // Linha do tempo comparativa (Antes vs. Depois do Manejo)
-            Card(modifier = Modifier.fillMaxWidth()) {
+            SolarCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -357,25 +363,20 @@ fun CumulativePlaceholderContent(
 }
 
 @Composable
-private fun MetricSummaryCard(
+private fun KpiStatCard(
     title: String,
     value: String,
     subtitle: String,
+    accentColor: Color,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
+    com.cacaoforecast.ai.ui.components.KpiStatCard(
+        label = title,
+        value = value,
+        subtitle = subtitle,
+        accentColor = accentColor,
+        modifier = modifier
+    )
 }
 
 @Composable
