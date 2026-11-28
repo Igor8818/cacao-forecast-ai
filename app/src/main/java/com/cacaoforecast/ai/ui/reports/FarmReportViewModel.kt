@@ -12,6 +12,7 @@ import com.cacaoforecast.ai.domain.model.ProductionBasis
 import com.cacaoforecast.ai.domain.model.ReportSortOrder
 import com.cacaoforecast.ai.domain.repository.CacaoRepository
 import com.cacaoforecast.ai.pdf.CsvReportExporter
+import com.cacaoforecast.ai.pdf.CumulativePdfReportGenerator
 import com.cacaoforecast.ai.pdf.PdfReportGenerator
 import com.cacaoforecast.ai.ui.theme.BrandIdentity
 import kotlinx.coroutines.Dispatchers
@@ -38,14 +39,18 @@ data class ReportFilterState(
     val periodLabel: String,
     val basis: ProductionBasis = ProductionBasis.NET_HEALTHY_NFS,
     val sortOrder: ReportSortOrder = ReportSortOrder.LOSS_DESC,
-    val cumulativePlotId: Long? = null
+    val cumulativePlotId: Long? = null,
+    val cumulativeStartMillis: Long? = null,
+    val cumulativeEndMillis: Long? = null,
+    val cumulativePeriodLabel: String = "Todo o Histórico"
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FarmReportViewModel(
     private val repository: CacaoRepository,
     private val pdfReportGenerator: PdfReportGenerator,
-    private val csvReportExporter: CsvReportExporter
+    private val csvReportExporter: CsvReportExporter,
+    private val cumulativePdfReportGenerator: CumulativePdfReportGenerator? = null
 ) : ViewModel() {
 
     private val activeFarmsSource = repository.observeActiveFarms()
@@ -88,14 +93,20 @@ class FarmReportViewModel(
     val cumulativeReport: StateFlow<CumulativePlotReport> = combine(plotsSource, _filters) { plotList, f ->
         val plotId = f.cumulativePlotId?.takeIf { id -> plotList.any { it.id == id } }
             ?: plotList.firstOrNull()?.id
-        plotId to f.basis
-    }.flatMapLatest { (plotId, basis) ->
+        Triple(plotId, f.basis, f.cumulativeStartMillis to f.cumulativeEndMillis)
+    }.flatMapLatest { (plotId, basis, range) ->
         if (plotId == null) {
             flowOf(CumulativeStatsCalculator.build(null, emptyList(), basis))
         } else {
+            val (startMs, endMs) = range
             repository.observeCompletedEvaluationsByPlot(plotId)
                 .flatMapLatest { evals ->
-                    flowOf(CumulativeStatsCalculator.build(plotId, evals, basis))
+                    val filtered = if (startMs != null && endMs != null) {
+                        evals.filter { it.dataMillis in startMs..endMs }
+                    } else {
+                        evals
+                    }
+                    flowOf(CumulativeStatsCalculator.build(plotId, filtered, basis))
                 }
         }
     }.stateIn(
@@ -146,6 +157,42 @@ class FarmReportViewModel(
         }
     }
 
+    fun selectCumulativePeriod(startMillis: Long?, endMillis: Long?, label: String) {
+        _filters.update {
+            it.copy(
+                cumulativeStartMillis = startMillis,
+                cumulativeEndMillis = endMillis,
+                cumulativePeriodLabel = label
+            )
+        }
+    }
+
+    fun openFarmReportForEvaluation(farmId: Long, evaluationMillis: Long) {
+        _filters.update { state ->
+            val inCurrentRange = evaluationMillis in state.startMillis..state.endMillis
+            if (inCurrentRange) {
+                state.copy(
+                    selectedFarmId = farmId,
+                    selectedPlotId = null,
+                    cumulativePlotId = null
+                )
+            } else {
+                val cal = Calendar.getInstance().apply { timeInMillis = evaluationMillis }
+                val y = cal.get(Calendar.YEAR)
+                val m = cal.get(Calendar.MONTH)
+                val (s, e) = monthRange(y, m)
+                state.copy(
+                    selectedFarmId = farmId,
+                    selectedPlotId = null,
+                    cumulativePlotId = null,
+                    startMillis = s,
+                    endMillis = e,
+                    periodLabel = formatMonthLabel(y, m)
+                )
+            }
+        }
+    }
+
     fun generatePdf(onGenerated: (File, String) -> Unit) {
         val currentReport = report.value ?: return
         if (currentReport.rows.isEmpty()) {
@@ -184,6 +231,47 @@ class FarmReportViewModel(
                 onGenerated(file, caption)
             }.onFailure { err ->
                 _message.value = err.message ?: "Erro ao exportar CSV."
+            }
+        }
+    }
+
+    fun generateCumulativePdf(onGenerated: (File, String) -> Unit) {
+        val generator = cumulativePdfReportGenerator ?: return
+        val currentCumul = cumulativeReport.value
+        val plotId = currentCumul.plotId
+        if (plotId == null || currentCumul.points.isEmpty()) {
+            _message.value = "Não há avaliações concluídas neste período para gerar o gráfico PDF."
+            return
+        }
+        val periodLabel = _filters.value.cumulativePeriodLabel
+        viewModelScope.launch {
+            val plot = plotsForSelectedFarm.value.find { it.id == plotId }
+                ?: withContext(Dispatchers.IO) { repository.getPlotById(plotId) }
+            if (plot == null) {
+                _message.value = "Não há avaliações concluídas neste período para gerar o gráfico PDF."
+                return@launch
+            }
+            val farm = farms.value.find { it.id == plot.fazendaId }
+                ?: withContext(Dispatchers.IO) { repository.getFarmById(plot.fazendaId) }
+            if (farm == null) {
+                _message.value = "Não há avaliações concluídas neste período para gerar o gráfico PDF."
+                return@launch
+            }
+            _isGeneratingPdf.value = true
+            val res = withContext(Dispatchers.IO) {
+                generator.generate(
+                    farm = farm,
+                    plot = plot,
+                    periodLabel = periodLabel,
+                    report = currentCumul
+                )
+            }
+            _isGeneratingPdf.value = false
+            res.onSuccess { file ->
+                val caption = "Relatório Cumulativo ${BrandIdentity.NAME} • ${farm.nome} / ${plot.nome} ($periodLabel)"
+                onGenerated(file, caption)
+            }.onFailure { err ->
+                _message.value = err.message ?: "Erro ao gerar PDF cumulativo."
             }
         }
     }
@@ -241,11 +329,17 @@ class FarmReportViewModel(
     class Factory(
         private val repository: CacaoRepository,
         private val pdfReportGenerator: PdfReportGenerator,
-        private val csvReportExporter: CsvReportExporter
+        private val csvReportExporter: CsvReportExporter,
+        private val cumulativePdfReportGenerator: CumulativePdfReportGenerator? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return FarmReportViewModel(repository, pdfReportGenerator, csvReportExporter) as T
+            return FarmReportViewModel(
+                repository,
+                pdfReportGenerator,
+                csvReportExporter,
+                cumulativePdfReportGenerator
+            ) as T
         }
     }
 }

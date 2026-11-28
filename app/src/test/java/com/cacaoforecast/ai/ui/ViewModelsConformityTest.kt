@@ -16,6 +16,8 @@ import com.cacaoforecast.ai.domain.model.Plot
 import com.cacaoforecast.ai.domain.model.ProductionBasis
 import com.cacaoforecast.ai.domain.model.ReportSortOrder
 import com.cacaoforecast.ai.pdf.CsvReportExporter
+import com.cacaoforecast.ai.pdf.CumulativePdfReportGenerator
+import com.cacaoforecast.ai.pdf.CumulativePdfReportGeneratorTest
 import com.cacaoforecast.ai.pdf.PdfReportGenerator
 import com.cacaoforecast.ai.ui.farms.FarmsViewModel
 import com.cacaoforecast.ai.ui.history.PlotHistoryViewModel
@@ -47,7 +49,10 @@ import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(
+    sdk = [34],
+    shadows = [CumulativePdfReportGeneratorTest.RecordingShadowPdfDocument::class]
+)
 class ViewModelsConformityTest {
 
     private val mainDispatcher = UnconfinedTestDispatcher()
@@ -302,7 +307,12 @@ class ViewModelsConformityTest {
         assertEquals(38.5, updatedHistory.single().producaoRealArrobas!!, 1e-6)
 
         // FarmReportViewModel: filtros e bloqueio de PDF/CSV quando vazio (sem depender de coletor em farms)
-        val reportVm = FarmReportViewModel(repository, PdfReportGenerator(context), CsvReportExporter(context))
+        val reportVm = FarmReportViewModel(
+            repository,
+            PdfReportGenerator(context),
+            CsvReportExporter(context),
+            CumulativePdfReportGenerator(context)
+        )
         reportVm.selectFarm(farmId)
         reportVm.selectPeriod(1_000_000L, 3_000_000L, "Período Teste")
 
@@ -333,6 +343,23 @@ class ViewModelsConformityTest {
         assertEquals(72.0, cumulative.totalEstimadaArrobas, 1e-6)
         assertEquals(38.5, cumulative.totalRealArrobas, 1e-6)
 
+        // Gera PDF cumulativo mesmo sem coletor ativo em farms/plotsForSelectedFarm
+        var exportedCumulPdf: File? = null
+        var cumulCaption = ""
+        reportVm.generateCumulativePdf { file, caption ->
+            exportedCumulPdf = file
+            cumulCaption = caption
+        }
+        val cumulStartWait = System.currentTimeMillis()
+        while (exportedCumulPdf == null && System.currentTimeMillis() - cumulStartWait < 3_000L) {
+            kotlinx.coroutines.delay(25)
+        }
+        assertNotNull(exportedCumulPdf)
+        assertTrue(exportedCumulPdf!!.exists())
+        assertEquals("%PDF-", exportedCumulPdf!!.inputStream().use { String(it.readNBytes(5)) })
+        assertTrue(cumulCaption.contains("Relatório Cumulativo"))
+        exportedCumulPdf!!.delete()
+
         // Alterna criterio para Bruto NFT e ordenacao por nome
         reportVm.selectBasis(ProductionBasis.GROSS_TOTAL_NFT)
         reportVm.selectSortOrder(ReportSortOrder.PLOT_NAME_ASC)
@@ -356,6 +383,70 @@ class ViewModelsConformityTest {
         var csvCalled = false
         reportVm.generateCsv { _, _ -> csvCalled = true }
         assertFalse(csvCalled)
+        assertNotNull(reportVm.message.value)
+    }
+
+    @Test
+    fun `FarmReportViewModel openFarmReportForEvaluation e selectCumulativePeriod sincronizam fazenda e periodo`() = runBlocking {
+        val farmAId = repository.saveFarm(Farm(nome = "Fazenda A")).getOrThrow()
+        val farmBId = repository.saveFarm(Farm(nome = "Fazenda B")).getOrThrow()
+        val plotBId = repository.savePlot(
+            Plot(fazendaId = farmBId, nome = "Quadra B", areaHa = 2.0, npt = 1000, fa = 250.0, npf = 1)
+        ).getOrThrow()
+        val plotB = repository.getPlotById(plotBId)!!
+
+        // Timestamp em 15/05/2026 12:00 UTC
+        val mayCal = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.MAY, 15, 12, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val mayMillis = mayCal.timeInMillis
+        currentClock = mayMillis
+
+        val draft = repository.startNewSamplingSession(plotB).getOrThrow()
+        repository.savePlantSample(draft.evaluationId, 1, 20, 0, 0, 0, 0, false, null).getOrThrow()
+        repository.finalizeSamplingSession(draft.evaluationId).getOrThrow()
+
+        val reportVm = FarmReportViewModel(
+            repository,
+            PdfReportGenerator(context),
+            CsvReportExporter(context),
+            CumulativePdfReportGenerator(context)
+        )
+        // Inicia explicitamente em outra fazenda e outro mes (Nov/2026)
+        val (novS, novE) = FarmReportViewModel.monthRange(2026, java.util.Calendar.NOVEMBER)
+        reportVm.selectFarm(farmAId)
+        reportVm.selectPeriod(novS, novE, "Nov/2026")
+
+        // Ao abrir a partir do resumo da avaliacao da Fazenda B (Maio/2026)
+        reportVm.openFarmReportForEvaluation(farmBId, mayMillis)
+
+        assertEquals(farmBId, reportVm.filters.value.selectedFarmId)
+        assertNull(reportVm.filters.value.selectedPlotId)
+        assertEquals("Mai/2026", reportVm.filters.value.periodLabel)
+
+        val syncedReport = reportVm.report.awaitValue {
+            it != null && it.farm.id == farmBId && it.rows.size == 1
+        }!!
+        assertEquals("Quadra B", syncedReport.rows.single().plotName)
+
+        // Filtro cumulativo para Maio/2026 deve incluir o ponto; para Nov/2026 deve zerar
+        val (mayS, mayE) = FarmReportViewModel.monthRange(2026, java.util.Calendar.MAY)
+        reportVm.selectCumulativePeriod(mayS, mayE, "Mai/2026")
+        val mayCumul = reportVm.cumulativeReport.awaitValue {
+            it.plotId == plotBId && it.points.size == 1
+        }
+        assertEquals(1, mayCumul.points.size)
+
+        reportVm.selectCumulativePeriod(novS, novE, "Nov/2026")
+        val novCumul = reportVm.cumulativeReport.awaitValue {
+            it.plotId == plotBId && it.points.isEmpty()
+        }
+        assertTrue(novCumul.points.isEmpty())
+
+        var emptyCumulPdfCalled = false
+        reportVm.generateCumulativePdf { _, _ -> emptyCumulPdfCalled = true }
+        assertFalse(emptyCumulPdfCalled)
         assertNotNull(reportVm.message.value)
     }
 }

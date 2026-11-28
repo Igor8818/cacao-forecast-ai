@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,9 +45,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cacaoforecast.ai.domain.model.DiseaseSeverity
 import com.cacaoforecast.ai.domain.model.DominantDisease
@@ -55,13 +59,16 @@ import com.cacaoforecast.ai.domain.model.FarmReportUiModel
 import com.cacaoforecast.ai.domain.model.Plot
 import com.cacaoforecast.ai.domain.model.ProductionBasis
 import com.cacaoforecast.ai.domain.model.ReportSortOrder
+import com.cacaoforecast.ai.pdf.PdfReportGenerator
 import com.cacaoforecast.ai.ui.components.KpiStatCard
 import com.cacaoforecast.ai.ui.components.SeverityPill
 import com.cacaoforecast.ai.ui.components.SolarCard
-import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
 import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
 import com.cacaoforecast.ai.ui.theme.CacaoGoldAccent
 import com.cacaoforecast.ai.ui.theme.CacaoZebraRow
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineBg
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineBorder
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineText
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalBg
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalRed
@@ -175,15 +182,21 @@ fun TabularReportContent(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedButton(
-                onClick = { showPeriodDialog = true },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(54.dp)
-            ) {
-                Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(filters.periodLabel, maxLines = 1)
+            Box(modifier = Modifier.weight(1f)) {
+                OutlinedTextField(
+                    value = filters.periodLabel,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Colheita", maxLines = 1, softWrap = false) },
+                    leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { showPeriodDialog = true }
+                )
             }
 
             ExposedDropdownMenuBox(
@@ -195,7 +208,7 @@ fun TabularReportContent(
                     value = selectedPlotName,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Quadras") },
+                    label = { Text("Quadras", maxLines = 1, softWrap = false) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(plotExpanded) },
                     singleLine = true,
                     modifier = Modifier
@@ -233,16 +246,26 @@ fun TabularReportContent(
                 onClick = { onSelectBasis(ProductionBasis.NET_HEALTHY_NFS) },
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
             ) {
-                Text("Líquida Sadia (NFS)", maxLines = 1)
+                Text("Líquida Sadia (NFS)", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             SegmentedButton(
                 selected = filters.basis == ProductionBasis.GROSS_TOTAL_NFT,
                 onClick = { onSelectBasis(ProductionBasis.GROSS_TOTAL_NFT) },
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
             ) {
-                Text("Potencial Bruto (NFT)", maxLines = 1)
+                Text("Potencial Bruto (NFT)", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+
+        Text(
+            text = if (filters.basis == ProductionBasis.GROSS_TOTAL_NFT) {
+                "Fórmula ativa (Potencial Total): Produção = ((NFT / NPF) × NPT) / FA"
+            } else {
+                "Fórmula ativa (Colheita Sadia): Produção = ((NFS / NPF) × NPT) / FA"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         if (report == null || report.rows.isEmpty()) {
             SolarCard(modifier = Modifier.fillMaxWidth()) {
@@ -256,7 +279,7 @@ fun TabularReportContent(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Avaliações em rascunho (em andamento) não entram no relatório consolidado até a conclusão de NPF/NPF plantas.",
+                        text = "Avaliações em rascunho (em andamento) não entram no relatório até que todas as árvores planejadas da quadra sejam avaliadas.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -290,7 +313,7 @@ fun TabularReportContent(
                     modifier = Modifier.weight(1f)
                 )
                 KpiStatCard(
-                    label = "Perda Ponderada",
+                    label = "Perda Média",
                     value = String.format(ptBr, "%.1f%%", f.perdasPonderadasPct),
                     subtitle = String.format(ptBr, "-%.1f @ perdidas", f.totalPerdaArrobas),
                     accentColor = totalLossColor,
@@ -302,8 +325,8 @@ fun TabularReportContent(
             if (f.totalMoniliaseFruits > 0) {
                 SolarCard(
                     modifier = Modifier.fillMaxWidth(),
-                    containerColor = BoxMoniliaseColor.copy(alpha = 0.12f),
-                    borderColor = BoxMoniliaseColor.copy(alpha = 0.5f)
+                    containerColor = MoniliaseQuarantineBg,
+                    borderColor = MoniliaseQuarantineBorder
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
@@ -312,7 +335,7 @@ fun TabularReportContent(
                         Icon(
                             imageVector = Icons.Default.Warning,
                             contentDescription = null,
-                            tint = BoxMoniliaseColor
+                            tint = MoniliaseQuarantineText
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
@@ -320,7 +343,7 @@ fun TabularReportContent(
                                 text = "ALERTA QUARENTENÁRIO — Monilíase (${f.totalMoniliaseFruits} fruto(s))",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = BoxMoniliaseColor
+                                color = MoniliaseQuarantineText
                             )
                             Text(
                                 text = "Roças afetadas: ${f.moniliaseAlertPlotNames.joinToString(", ")}. Isolar área e acionar assistência técnica CEPLAC.",
@@ -371,24 +394,27 @@ fun TabularReportContent(
 
             // Chips de Ordenação
             Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
                     selected = filters.sortOrder == ReportSortOrder.LOSS_DESC,
                     onClick = { onSelectSortOrder(ReportSortOrder.LOSS_DESC) },
-                    label = { Text("Maior Perda (%)") }
+                    label = { Text("Maior Perda (%)", maxLines = 1) }
                 )
                 FilterChip(
                     selected = filters.sortOrder == ReportSortOrder.PRODUCTION_DESC,
                     onClick = { onSelectSortOrder(ReportSortOrder.PRODUCTION_DESC) },
-                    label = { Text("Maior Produção (@)") }
+                    label = { Text("Maior Safra (@)", maxLines = 1) }
                 )
                 FilterChip(
                     selected = filters.sortOrder == ReportSortOrder.PLOT_NAME_ASC,
                     onClick = { onSelectSortOrder(ReportSortOrder.PLOT_NAME_ASC) },
-                    label = { Text("Nome A–Z") }
+                    label = { Text("Nome A–Z", maxLines = 1) }
                 )
+                Spacer(modifier = Modifier.width(4.dp))
             }
 
             Text(
@@ -397,96 +423,110 @@ fun TabularReportContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            // Tabela de 6 colunas oficiais + Rodapé Consolidado
+            // Tabela de 6 colunas oficiais (fiel ao modelo da chefia: Roça, Área, Npla, Prod. (@), Produt., Perdas)
             val hScroll = rememberScrollState()
             SolarCard(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(hScroll)
-                ) {
-                    val basisHeader = if (report.basis == ProductionBasis.NET_HEALTHY_NFS) {
-                        "Prod. (@ Líq.)"
-                    } else {
-                        "Prod. (@ Bruta)"
-                    }
-
-                    // Header
-                    Row(
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(
                         modifier = Modifier
-                            .background(MaterialTheme.colorScheme.primary)
-                            .padding(vertical = 10.dp, horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxWidth()
+                            .horizontalScroll(hScroll)
                     ) {
-                        TableCell("Roça", 156.dp, Color.White, FontWeight.Bold, TextAlign.Start)
-                        TableCell("Área (ha)", 76.dp, Color.White, FontWeight.Bold)
-                        TableCell("Npla", 70.dp, Color.White, FontWeight.Bold)
-                        TableCell(basisHeader, 96.dp, Color.White, FontWeight.Bold)
-                        TableCell("Produt. (@/ha)", 100.dp, Color.White, FontWeight.Bold)
-                        TableCell("Perdas (%)", 132.dp, Color.White, FontWeight.Bold)
-                    }
-
-                    report.rows.forEachIndexed { idx, row ->
-                        val rowBg = when (row.severity) {
-                            DiseaseSeverity.CRITICAL -> SeverityCriticalBg
-                            DiseaseSeverity.WARNING -> SeverityWarningBg
-                            DiseaseSeverity.CONTROLLED -> if (idx % 2 == 1) CacaoZebraRow else Color.Transparent
-                        }
-                        val weight = if (row.severity == DiseaseSeverity.CRITICAL) FontWeight.Bold else FontWeight.Normal
-
+                        // Header
                         Row(
                             modifier = Modifier
-                                .background(rowBg)
-                                .clickable { onOpenPlotHistory(report.farm.id, row.plotId) }
+                                .background(MaterialTheme.colorScheme.primary)
                                 .padding(vertical = 10.dp, horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.width(156.dp)) {
-                                Text(
-                                    text = row.plotName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (row.severity == DiseaseSeverity.CRITICAL) FontWeight.Bold else FontWeight.SemiBold
-                                )
-                                if (row.evaluationsCountInPeriod > 1) {
+                            TableCell("Roça", 118.dp, Color.White, FontWeight.Bold, TextAlign.Start)
+                            TableCell("Área (ha)", 66.dp, Color.White, FontWeight.Bold)
+                            TableCell("Npla", 64.dp, Color.White, FontWeight.Bold)
+                            TableCell("Prod. (@)", 88.dp, Color.White, FontWeight.Bold)
+                            TableCell("Produt. (@/ha)", 94.dp, Color.White, FontWeight.Bold)
+                            TableCell("Perdas (%)", 132.dp, Color.White, FontWeight.Bold)
+                        }
+
+                        report.rows.forEachIndexed { idx, row ->
+                            val rowBg = when (row.severity) {
+                                DiseaseSeverity.CRITICAL -> SeverityCriticalBg
+                                DiseaseSeverity.WARNING -> SeverityWarningBg
+                                DiseaseSeverity.CONTROLLED -> if (idx % 2 == 1) CacaoZebraRow else Color.Transparent
+                            }
+                            val weight = if (row.severity == DiseaseSeverity.CRITICAL) FontWeight.Bold else FontWeight.Normal
+
+                            Row(
+                                modifier = Modifier
+                                    .background(rowBg)
+                                    .clickable { onOpenPlotHistory(report.farm.id, row.plotId) }
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.width(118.dp)) {
                                     Text(
-                                        text = "Últ. ${dayMonthFmt.format(Date(row.evaluationDateMillis))} • ${row.evaluationsCountInPeriod} aval.",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = row.plotName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (row.severity == DiseaseSeverity.CRITICAL) FontWeight.Bold else FontWeight.SemiBold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
+                                    if (row.evaluationsCountInPeriod > 1) {
+                                        Text(
+                                            text = "Últ. ${dayMonthFmt.format(Date(row.evaluationDateMillis))} • ${row.evaluationsCountInPeriod} aval.",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                TableCell(String.format(ptBr, "%.2f", row.areaHa), 66.dp, MaterialTheme.colorScheme.onSurface, weight)
+                                TableCell(String.format(ptBr, "%,d", row.npt), 64.dp, MaterialTheme.colorScheme.onSurface, weight)
+                                TableCell(String.format(ptBr, "%.1f", row.producaoExibidaArrobas), 88.dp, MaterialTheme.colorScheme.onSurface, weight)
+                                TableCell(String.format(ptBr, "%.1f", row.produtividadeExibidaPorHa), 94.dp, MaterialTheme.colorScheme.onSurface, weight)
+                                Box(
+                                    modifier = Modifier.width(132.dp),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    SeverityPill(severity = row.severity, lossPct = row.perdasPct)
                                 }
                             }
-                            TableCell(String.format(ptBr, "%.2f", row.areaHa), 76.dp, MaterialTheme.colorScheme.onSurface, weight)
-                            TableCell(row.npt.toString(), 70.dp, MaterialTheme.colorScheme.onSurface, weight)
-                            TableCell(String.format(ptBr, "%.1f", row.producaoExibidaArrobas), 96.dp, MaterialTheme.colorScheme.onSurface, weight)
-                            TableCell(String.format(ptBr, "%.1f", row.produtividadeExibidaPorHa), 100.dp, MaterialTheme.colorScheme.onSurface, weight)
+                            HorizontalDivider()
+                        }
+
+                        // Rodapé fixo Total / Consolidado da Fazenda
+                        Row(
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(vertical = 12.dp, horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TableCell("TOTAL FAZENDA", 118.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold, TextAlign.Start)
+                            TableCell(String.format(ptBr, "%.2f", f.totalAreaHa), 66.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
+                            TableCell(String.format(ptBr, "%,d", f.totalNpt), 64.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
+                            TableCell(String.format(ptBr, "%.1f", f.totalProducaoExibidaArrobas), 88.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
+                            TableCell(String.format(ptBr, "%.1f", f.produtividadeConsolidadaPorHa), 94.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
                             Box(
                                 modifier = Modifier.width(132.dp),
                                 contentAlignment = Alignment.CenterEnd
                             ) {
-                                SeverityPill(severity = row.severity, lossPct = row.perdasPct)
+                                SeverityPill(severity = f.severity, lossPct = f.perdasPonderadasPct)
                             }
                         }
-                        HorizontalDivider()
                     }
 
-                    // Rodapé fixo Total / Consolidado da Fazenda
-                    Row(
-                        modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(vertical = 12.dp, horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TableCell("TOTAL FAZENDA", 156.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold, TextAlign.Start)
-                        TableCell(String.format(ptBr, "%.2f", f.totalAreaHa), 76.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
-                        TableCell(f.totalNpt.toString(), 70.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
-                        TableCell(String.format(ptBr, "%.1f", f.totalProducaoExibidaArrobas), 96.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
-                        TableCell(String.format(ptBr, "%.1f", f.produtividadeConsolidadaPorHa), 100.dp, MaterialTheme.colorScheme.onSurface, FontWeight.Bold)
+                    if (hScroll.canScrollForward) {
                         Box(
-                            modifier = Modifier.width(132.dp),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            SeverityPill(severity = f.severity, lossPct = f.perdasPonderadasPct)
-                        }
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .fillMaxHeight()
+                                .width(18.dp)
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.09f))
+                                    )
+                                )
+                        )
                     }
                 }
             }
@@ -541,11 +581,19 @@ fun TabularReportContent(
                     Text("Planilha (.csv)", maxLines = 1)
                 }
             }
+
+            Text(
+                text = PdfReportGenerator.DISCLAIMER_TEXT,
+                style = MaterialTheme.typography.labelSmall,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 
     if (showPeriodDialog) {
         PeriodPickerDialog(
+            currentPeriodLabel = filters.periodLabel,
             onDismiss = { showPeriodDialog = false },
             onSelectPeriod = { start, end, label ->
                 onSelectPeriod(start, end, label)

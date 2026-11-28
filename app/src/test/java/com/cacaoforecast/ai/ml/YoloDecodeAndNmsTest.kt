@@ -112,4 +112,92 @@ class YoloDecodeAndNmsTest {
 
         assertEquals(40, detections.size)
     }
+
+    @Test
+    fun `decodifica tensor nao transposto com logits e pixels integrando fusao dual model`() {
+        // Imagem retrato 1200x1600 -> scale = 640/1600 = 0.4, newW=480, newH=640, padX=80, padY=0
+        val geometry = LetterboxGeometry.compute(1200, 1600, 640)
+        assertEquals(0.4f, geometry.scale, 1e-5f)
+        assertEquals(80f, geometry.padX, 1e-5f)
+        assertEquals(0f, geometry.padY, 1e-5f)
+
+        // Detector de contagem (transposto 1x5x8400) com 2 frutos sadios (em coordenadas normalizadas)
+        val countMatrix = Array(5) { FloatArray(8400) }
+        // Fruto 1 no centro da imagem
+        countMatrix[0][0] = 0.50f; countMatrix[1][0] = 0.50f; countMatrix[2][0] = 0.15f; countMatrix[3][0] = 0.20f
+        countMatrix[4][0] = 0.91f
+        // Fruto 2 no quadrante inferior esquerdo (tensor x=0.25, y=0.75 -> dentro do quadro)
+        countMatrix[0][1] = 0.30f; countMatrix[1][1] = 0.75f; countMatrix[2][1] = 0.10f; countMatrix[3][1] = 0.15f
+        countMatrix[4][1] = 0.84f
+
+        val countDetections = YoloTfliteInterpreter.decodeAndNms(
+            outputMatrix = countMatrix,
+            numClasses = 1,
+            transposed = true,
+            geometry = geometry,
+            scoreThreshold = 0.30f,
+            maxResults = 100
+        )
+        assertEquals(2, countDetections.size)
+
+        // Detector de doenca nao-transposto [8400, 8] com logits brutos e coordenadas em pixels (0..640)
+        val diseaseMatrix = Array(8400) { FloatArray(8) { -10f } }
+        // Anchor 0: sobrepoe Fruto 1 (cx=320f, cy=320f, w=96f, h=128f), classe 1 (Moniliase) com logit +3.0
+        diseaseMatrix[0][0] = 320f; diseaseMatrix[0][1] = 320f
+        diseaseMatrix[0][2] = 96f; diseaseMatrix[0][3] = 128f
+        diseaseMatrix[0][5] = 3.0f // sigmoid(3.0) ~= 0.9526
+
+        // Anchor 1: competidor altamente sobreposto no mesmo fruto em classe 0 (Podridao), logit menor +1.2 -> deve ser suprimido
+        diseaseMatrix[1][0] = 322f; diseaseMatrix[1][1] = 319f
+        diseaseMatrix[1][2] = 95f; diseaseMatrix[1][3] = 126f
+        diseaseMatrix[1][4] = 1.2f
+
+        val diseaseDetections = YoloTfliteInterpreter.decodeAndNms(
+            outputMatrix = diseaseMatrix,
+            numClasses = 4,
+            transposed = false,
+            geometry = geometry,
+            scoreThreshold = 0.25f,
+            maxResults = 100
+        )
+        assertEquals(1, diseaseDetections.size)
+        assertEquals(FruitHealthCategory.MONILIASE, diseaseDetections.single().category)
+        assertTrue(diseaseDetections.single().confidence > 0.90f)
+
+        val fused = DualModelFusionProcessor.fuse(
+            countingBoxes = countDetections.map {
+                DualModelFusionProcessor.FusionBoxInput(
+                    normLeft = it.normLeft,
+                    normTop = it.normTop,
+                    normRight = it.normRight,
+                    normBottom = it.normBottom,
+                    category = it.category,
+                    confidence = it.confidence
+                )
+            },
+            diseaseBoxes = diseaseDetections.map {
+                DualModelFusionProcessor.FusionBoxInput(
+                    normLeft = it.normLeft,
+                    normTop = it.normTop,
+                    normRight = it.normRight,
+                    normBottom = it.normBottom,
+                    category = it.category,
+                    confidence = it.confidence
+                )
+            },
+            iouMinimo = 0.35f
+        )
+
+        assertEquals(2, fused.size)
+        assertEquals(1, fused.count { it.category == FruitHealthCategory.SADIO })
+        assertEquals(1, fused.count { it.category == FruitHealthCategory.MONILIASE })
+        fused.forEach { box ->
+            assertTrue(box.normLeft in 0f..1f)
+            assertTrue(box.normTop in 0f..1f)
+            assertTrue(box.normRight in 0f..1f)
+            assertTrue(box.normBottom in 0f..1f)
+            assertTrue(box.normRight > box.normLeft)
+            assertTrue(box.normBottom > box.normTop)
+        }
+    }
 }

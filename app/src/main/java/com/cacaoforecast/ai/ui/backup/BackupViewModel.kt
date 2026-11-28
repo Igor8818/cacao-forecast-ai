@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.cacaoforecast.ai.data.backup.SqliteBackupManager
+import com.cacaoforecast.ai.data.demo.DemoSeedManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,7 +20,8 @@ data class BackupUiState(
 )
 
 class BackupViewModel(
-    private val backupManager: SqliteBackupManager
+    private val backupManager: SqliteBackupManager,
+    private val demoSeedManager: DemoSeedManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BackupUiState())
@@ -102,10 +104,39 @@ class BackupViewModel(
         }
     }
 
-    class Factory(private val backupManager: SqliteBackupManager) : ViewModelProvider.Factory {
+    fun loadSempreVivaDemo() {
+        val seeder = demoSeedManager ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true, statusMessage = null, isError = false) }
+            seeder.seedSempreVivaDemo()
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isBusy = false,
+                            statusMessage = "Fazenda \"Sempre Viva\" carregada para demonstração!",
+                            isError = false
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    _uiState.update {
+                        it.copy(
+                            isBusy = false,
+                            statusMessage = err.message ?: "Erro ao carregar fazenda de demonstração.",
+                            isError = true
+                        )
+                    }
+                }
+        }
+    }
+
+    class Factory(
+        private val backupManager: SqliteBackupManager,
+        private val demoSeedManager: DemoSeedManager? = null
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return BackupViewModel(backupManager) as T
+            return BackupViewModel(backupManager, demoSeedManager) as T
         }
     }
 }

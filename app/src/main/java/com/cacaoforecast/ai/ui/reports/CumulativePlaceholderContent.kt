@@ -3,6 +3,7 @@ package com.cacaoforecast.ai.ui.reports
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,6 +36,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -51,18 +56,24 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cacaoforecast.ai.domain.model.CumulativeEvaluationPoint
 import com.cacaoforecast.ai.domain.model.CumulativePlotReport
 import com.cacaoforecast.ai.domain.model.Farm
 import com.cacaoforecast.ai.domain.model.Plot
 import com.cacaoforecast.ai.domain.model.ProductionBasis
+import com.cacaoforecast.ai.pdf.PdfReportGenerator
 import com.cacaoforecast.ai.ui.components.KpiStatCard
 import com.cacaoforecast.ai.ui.components.SolarCard
-import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
+import com.cacaoforecast.ai.ui.theme.CacaoForestContainer
 import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
 import com.cacaoforecast.ai.ui.theme.CacaoGoldAccent
+import com.cacaoforecast.ai.ui.theme.CacaoSelectedPlotBg
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineBg
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineText
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalRed
 import com.cacaoforecast.ai.ui.theme.SeverityWarningAmber
@@ -77,20 +88,26 @@ fun CumulativePlaceholderContent(
     selectedFarmId: Long?,
     plots: List<Plot>,
     selectedPlotId: Long?,
+    cumulativePeriodLabel: String,
     basis: ProductionBasis,
     cumulativeReport: CumulativePlotReport,
+    isGeneratingPdf: Boolean,
     onSelectFarm: (Long) -> Unit,
     onSelectPlot: (Long) -> Unit,
+    onSelectPeriod: (Long?, Long?, String) -> Unit,
     onSelectBasis: (ProductionBasis) -> Unit,
-    onOpenPlotHistory: (Long, Long) -> Unit
+    onOpenPlotHistory: (Long, Long) -> Unit,
+    onShareCumulativeWhatsApp: () -> Unit,
+    onShareCumulativeGenericPdf: () -> Unit
 ) {
     var farmExpanded by remember { mutableStateOf(false) }
     var plotExpanded by remember { mutableStateOf(false) }
+    var showPeriodDialog by remember { mutableStateOf(false) }
 
     val activeFarm = farms.find { it.id == selectedFarmId } ?: farms.firstOrNull()
     val activePlot = plots.find { it.id == selectedPlotId } ?: plots.firstOrNull()
     val ptBr = remember { Locale("pt", "BR") }
-    val dayMonthFmt = remember { SimpleDateFormat("dd/MM", ptBr) }
+    val dayMonthFmt = remember { SimpleDateFormat("dd/MM/yy", ptBr) }
 
     Column(
         modifier = Modifier
@@ -132,33 +149,58 @@ fun CumulativePlaceholderContent(
         }
 
         if (plots.isNotEmpty() && activePlot != null) {
-            ExposedDropdownMenuBox(
-                expanded = plotExpanded,
-                onExpandedChange = { plotExpanded = !plotExpanded }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = activePlot.nome,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Roça / Quadra Específica") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(plotExpanded) },
-                    modifier = Modifier
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                        .fillMaxWidth()
-                )
-                ExposedDropdownMenu(
+                ExposedDropdownMenuBox(
                     expanded = plotExpanded,
-                    onDismissRequest = { plotExpanded = false }
+                    onExpandedChange = { plotExpanded = !plotExpanded },
+                    modifier = Modifier.weight(1.2f)
                 ) {
-                    plots.forEach { plot ->
-                        DropdownMenuItem(
-                            text = { Text(plot.nome) },
-                            onClick = {
-                                onSelectPlot(plot.id)
-                                plotExpanded = false
-                            }
-                        )
+                    OutlinedTextField(
+                        value = activePlot.nome,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Roça / Quadra Específica", maxLines = 1, softWrap = false) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(plotExpanded) },
+                        singleLine = true,
+                        modifier = Modifier
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = plotExpanded,
+                        onDismissRequest = { plotExpanded = false }
+                    ) {
+                        plots.forEach { plot ->
+                            DropdownMenuItem(
+                                text = { Text(plot.nome) },
+                                onClick = {
+                                    onSelectPlot(plot.id)
+                                    plotExpanded = false
+                                }
+                            )
+                        }
                     }
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = cumulativePeriodLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Colheita", maxLines = 1, softWrap = false) },
+                        leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showPeriodDialog = true }
+                    )
                 }
             }
         }
@@ -169,16 +211,26 @@ fun CumulativePlaceholderContent(
                 onClick = { onSelectBasis(ProductionBasis.NET_HEALTHY_NFS) },
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
             ) {
-                Text("Líquida Sadia (NFS)", maxLines = 1)
+                Text("Líquida Sadia (NFS)", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             SegmentedButton(
                 selected = basis == ProductionBasis.GROSS_TOTAL_NFT,
                 onClick = { onSelectBasis(ProductionBasis.GROSS_TOTAL_NFT) },
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
             ) {
-                Text("Potencial Bruto (NFT)", maxLines = 1)
+                Text("Potencial Bruto (NFT)", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+
+        Text(
+            text = if (basis == ProductionBasis.GROSS_TOTAL_NFT) {
+                "Fórmula ativa (Potencial Total): Produção = ((NFT / NPF) × NPT) / FA"
+            } else {
+                "Fórmula ativa (Colheita Sadia): Produção = ((NFS / NPF) × NPT) / FA"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         if (cumulativeReport.points.isEmpty()) {
             Card(
@@ -235,11 +287,26 @@ fun CumulativePlaceholderContent(
                     title = "Erro Médio",
                     value = cumulativeReport.meanRelativeErrorPct?.let {
                         String.format(ptBr, "%.1f%%", it)
-                    } ?: "Sem real",
+                    } ?: "—",
                     subtitle = "vs. colhido",
                     accentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            if (cumulativeReport.evaluationsWithRealCount == 0) {
+                SolarCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = CacaoSelectedPlotBg,
+                    borderColor = CacaoForestContainer
+                ) {
+                    Text(
+                        text = "Como informar a Produção Real (@)? Após colher e secar o cacau desta quadra, toque no botão \"Lançar / Editar Produção Real no Histórico\" abaixo para traçar a curva real ao lado da estimada.",
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
 
             // Gráfico Temporal Estimada vs. Real
@@ -248,11 +315,22 @@ fun CumulativePlaceholderContent(
                     modifier = Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(
-                        text = "Evolução Temporal: Estimada vs. Real (@)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Evolução Temporal",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Produção (@)",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     EstimatedVsRealChart(
                         points = cumulativeReport.points,
                         dayMonthFmt = dayMonthFmt,
@@ -266,8 +344,8 @@ fun CumulativePlaceholderContent(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        LegendDot(color = CacaoForestPrimary, label = "Estimada (@)")
-                        LegendDot(color = SeverityWarningAmber, label = "Produção Real (@)")
+                        LegendDot(color = CacaoForestPrimary, label = "ProdEstimada (@)")
+                        LegendDot(color = SeverityWarningAmber, label = "ProdReal (@)")
                     }
                 }
             }
@@ -329,7 +407,7 @@ fun CumulativePlaceholderContent(
                                     Icon(
                                         imageVector = Icons.Default.Warning,
                                         contentDescription = null,
-                                        tint = BoxMoniliaseColor,
+                                        tint = MoniliaseQuarantineText,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -337,7 +415,7 @@ fun CumulativePlaceholderContent(
                                         text = "Alerta Quarentenário: ${pt.nMoniliase} fruto(s) com Monilíase",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = BoxMoniliaseColor
+                                        color = MoniliaseQuarantineText
                                     )
                                 }
                             }
@@ -348,17 +426,66 @@ fun CumulativePlaceholderContent(
         }
 
         if (activeFarm != null && activePlot != null) {
-            Button(
+            if (cumulativeReport.points.isNotEmpty()) {
+                Button(
+                    onClick = onShareCumulativeWhatsApp,
+                    enabled = !isGeneratingPdf,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                ) {
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Enviar Gráfico PDF no WhatsApp")
+                }
+
+                OutlinedButton(
+                    onClick = onShareCumulativeGenericPdf,
+                    enabled = !isGeneratingPdf,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Salvar PDF Cumulativo")
+                }
+            }
+
+            OutlinedButton(
                 onClick = { onOpenPlotHistory(activeFarm.id, activePlot.id) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
+                    .height(50.dp)
             ) {
                 Icon(Icons.Default.History, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Lançar / Editar Produção Real no Histórico")
             }
+
+            Text(
+                text = PdfReportGenerator.DISCLAIMER_TEXT,
+                style = MaterialTheme.typography.labelSmall,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
+    }
+
+    if (showPeriodDialog) {
+        PeriodPickerDialog(
+            currentPeriodLabel = cumulativePeriodLabel,
+            allowAllHistory = true,
+            onSelectAllHistory = {
+                onSelectPeriod(null, null, "Todo o Histórico")
+                showPeriodDialog = false
+            },
+            onDismiss = { showPeriodDialog = false },
+            onSelectPeriod = { start, end, label ->
+                onSelectPeriod(start, end, label)
+                showPeriodDialog = false
+            }
+        )
     }
 }
 
@@ -505,7 +632,7 @@ private fun EstimatedVsRealChart(
                 val label = dayMonthFmt.format(Date(pt.dataMillis))
                 drawContext.canvas.nativeCanvas.drawText(
                     label,
-                    (x - 28f).coerceIn(leftPad, leftPad + chartW - 60f),
+                    (x - 42f).coerceIn(leftPad, (leftPad + chartW - 108f).coerceAtLeast(leftPad)),
                     topPad + chartH + 34f,
                     axisTextPaint
                 )

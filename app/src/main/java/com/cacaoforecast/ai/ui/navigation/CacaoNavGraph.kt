@@ -1,7 +1,6 @@
 package com.cacaoforecast.ai.ui.navigation
 
 import android.net.Uri
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Agriculture
@@ -18,7 +17,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -63,7 +61,8 @@ fun CacaoNavGraph(appContainer: AppContainer) {
             factory = FarmReportViewModel.Factory(
                 repository = appContainer.repository,
                 pdfReportGenerator = appContainer.pdfReportGenerator,
-                csvReportExporter = appContainer.csvReportExporter
+                csvReportExporter = appContainer.csvReportExporter,
+                cumulativePdfReportGenerator = appContainer.cumulativePdfReportGenerator
             )
         )
 
@@ -74,19 +73,30 @@ fun CacaoNavGraph(appContainer: AppContainer) {
         )
 
         fun navigateTopTab(route: String) {
+            if (route == Routes.FARMS_LIST) {
+                val popped = navController.popBackStack(Routes.FARMS_LIST, inclusive = false)
+                if (!popped) {
+                    navController.navigate(Routes.FARMS_LIST) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            inclusive = false
+                        }
+                        launchSingleTop = true
+                    }
+                }
+                return
+            }
             navController.navigate(route) {
-                popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
+                popUpTo(Routes.FARMS_LIST) {
+                    inclusive = false
                 }
                 launchSingleTop = true
-                restoreState = true
             }
         }
 
         Scaffold(
             bottomBar = {
                 if (showBottomBar) {
-                    NavigationBar(modifier = Modifier.height(74.dp)) {
+                    NavigationBar {
                         val farmsSelected = currentRoute == Routes.FARMS_LIST
                         NavigationBarItem(
                             selected = farmsSelected,
@@ -150,7 +160,10 @@ fun CacaoNavGraph(appContainer: AppContainer) {
                         viewModel = farmsViewModel,
                         onBack = { navController.popBackStack() },
                         onStartSampling = { fId, pId ->
-                            navController.navigate(Routes.samplingSetup(fId, pId))
+                            navController.navigate(Routes.samplingSetup(fId, pId)) {
+                                popUpTo(Routes.FARMS_LIST) { inclusive = false }
+                                launchSingleTop = true
+                            }
                         },
                         onOpenHistory = { fId, pId ->
                             navController.navigate(Routes.plotHistory(fId, pId))
@@ -177,7 +190,10 @@ fun CacaoNavGraph(appContainer: AppContainer) {
 
                 composable(Routes.BACKUP_RESTORE) {
                     val backupViewModel: BackupViewModel = viewModel(
-                        factory = BackupViewModel.Factory(appContainer.backupManager)
+                        factory = BackupViewModel.Factory(
+                            backupManager = appContainer.backupManager,
+                            demoSeedManager = appContainer.demoSeedManager
+                        )
                     )
                     BackupRestoreScreen(
                         viewModel = backupViewModel,
@@ -257,9 +273,18 @@ fun CacaoNavGraph(appContainer: AppContainer) {
                     SamplingSummaryScreen(
                         evaluationId = evalId,
                         viewModel = samplingViewModel,
-                        onGoToReports = { navigateTopTab(Routes.REPORTS_HUB) },
+                        onGoToReports = { farmId, evalMillis ->
+                            reportViewModel.openFarmReportForEvaluation(farmId, evalMillis)
+                            navigateTopTab(Routes.REPORTS_HUB)
+                        },
                         onDoneToSetup = {
-                            navController.popBackStack(Routes.SAMPLING_SETUP_PATTERN, inclusive = false)
+                            val popped = navController.popBackStack(
+                                Routes.SAMPLING_SETUP_PATTERN,
+                                inclusive = false
+                            )
+                            if (!popped) {
+                                navigateTopTab(Routes.samplingSetup())
+                            }
                         }
                     )
                 }

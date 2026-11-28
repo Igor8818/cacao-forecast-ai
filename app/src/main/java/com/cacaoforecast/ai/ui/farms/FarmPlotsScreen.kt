@@ -17,11 +17,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -91,7 +91,7 @@ fun FarmPlotsScreen(
                 onBack = onBack,
                 actions = {
                     IconButton(onClick = { showGlossary = true }) {
-                        Icon(Icons.Default.HelpOutline, contentDescription = "Guia Rápido")
+                        Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = "Guia Rápido")
                     }
                 }
             )
@@ -170,14 +170,14 @@ fun FarmPlotsScreen(
                         )
                         KpiStatCard(
                             label = "Área Total",
-                            value = String.format(ptBr, "%.2f ha", totalArea),
-                            subtitle = "cadastrados",
+                            value = String.format(ptBr, "%.2f\u00A0ha", totalArea),
+                            subtitle = "cadastrada",
                             accentColor = CacaoPodSecondary,
                             modifier = Modifier.weight(1f)
                         )
                         KpiStatCard(
                             label = "Cacaueiros",
-                            value = "$totalNpt",
+                            value = String.format(ptBr, "%,d", totalNpt),
                             subtitle = "plantas",
                             accentColor = CacaoForestPrimary,
                             modifier = Modifier.weight(1f)
@@ -217,10 +217,10 @@ fun FarmPlotsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                ParamPill(String.format(ptBr, "%.2f ha", plot.areaHa))
-                                ParamPill("${plot.npt} pés")
-                                ParamPill(String.format(ptBr, "FA %.0f", plot.fa))
-                                ParamPill("Meta: ${plot.npf} fotos")
+                                ParamPill(String.format(ptBr, "%.2f\u00A0ha", plot.areaHa))
+                                ParamPill(String.format(ptBr, "%,d\u00A0pés", plot.npt))
+                                ParamPill(String.format(ptBr, "FA\u00A0%.0f", plot.fa))
+                                ParamPill("Meta: ${plot.npf}\u00A0fotos")
                             }
 
                             Row(
@@ -245,7 +245,7 @@ fun FarmPlotsScreen(
                                 ) {
                                     Icon(Icons.Default.History, contentDescription = null)
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Histórico", maxLines = 1)
+                                    Text("Histórico / Real", maxLines = 1)
                                 }
                             }
                         }

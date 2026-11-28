@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -62,6 +62,7 @@ fun BackupRestoreScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var showDemoDialog by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -82,7 +83,7 @@ fun BackupRestoreScreen(
     Scaffold(
         topBar = {
             BrandTopAppBar(
-                title = "Backup & Restauração SQLite",
+                title = "Backup & Restauração",
                 subtitle = BrandIdentity.NAME,
                 onBack = onBack
             )
@@ -116,17 +117,18 @@ fun BackupRestoreScreen(
                 }
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            SolarCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("Exportar Base Local (.db)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "Executa checkpoint completo do WAL (PRAGMA wal_checkpoint(FULL)) antes de gerar a cópia íntegra.",
+                        "Exportar Cópia de Segurança (.db)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Salva todas as fazendas, roças, amostragens e colheitas no aparelho/MicroSD ou envia para nuvem (Google Drive, e-mail, WhatsApp).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -143,7 +145,7 @@ fun BackupRestoreScreen(
             ) {
                 Icon(Icons.Default.CloudDownload, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Salvar Backup no Aparelho (.db)")
+                Text("Salvar no Aparelho / MicroSD (.db)")
             }
 
             OutlinedButton(
@@ -153,7 +155,7 @@ fun BackupRestoreScreen(
                             context = context,
                             file = file,
                             mimeType = "application/octet-stream",
-                            chooserTitle = "Compartilhar Backup SQLite (.db)"
+                            chooserTitle = "Enviar Backup para Nuvem (.db)"
                         )
                     }
                 },
@@ -162,22 +164,23 @@ fun BackupRestoreScreen(
             ) {
                 Icon(Icons.Default.Share, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Compartilhar Arquivo .db")
+                Text("Enviar para Nuvem / Compartilhar (.db)")
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            SolarCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("Importar / Restaurar Backup (.db)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "Valida assinatura SQLite, PRAGMA integrity_check, versão e tabelas antes de substituir a base. Se falhar, mantém os dados atuais intactos.",
+                        "Importar / Restaurar Backup (.db)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Verifica automaticamente a integridade do arquivo antes de restaurar. Se houver qualquer falha, seus dados atuais permanecem intactos.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -193,7 +196,61 @@ fun BackupRestoreScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Selecionar Arquivo .db para Restaurar")
             }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            SolarCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Modo Apresentação Executiva",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Carrega a fazenda de exemplo \"Sempre Viva\" (Topo do Morro, Jatium e Peroto do Rio + série de 6 meses) sem apagar suas outras fazendas.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(
+                        onClick = { showDemoDialog = true },
+                        enabled = !uiState.isBusy,
+                        modifier = Modifier.fillMaxWidth().height(50.dp)
+                    ) {
+                        Icon(Icons.Default.Eco, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Carregar Fazenda \"Sempre Viva\"")
+                    }
+                }
+            }
         }
+    }
+
+    if (showDemoDialog) {
+        AlertDialog(
+            onDismissRequest = { showDemoDialog = false },
+            title = { Text("Carregar Fazenda de Demonstração?") },
+            text = {
+                Text("Será criada/atualizada a fazenda \"Sempre Viva\" com 3 quadras e avaliações simuladas para apresentação. Suas demais fazendas não serão alteradas.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDemoDialog = false
+                        viewModel.loadSempreVivaDemo()
+                    }
+                ) {
+                    Text("Carregar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDemoDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     pendingImportUri?.let { uri ->

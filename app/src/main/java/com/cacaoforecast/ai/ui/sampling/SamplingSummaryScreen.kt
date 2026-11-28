@@ -35,9 +35,11 @@ import com.cacaoforecast.ai.ui.components.BrandTopAppBar
 import com.cacaoforecast.ai.ui.components.KpiStatCard
 import com.cacaoforecast.ai.ui.components.SeverityPill
 import com.cacaoforecast.ai.ui.components.SolarCard
-import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
 import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
 import com.cacaoforecast.ai.ui.theme.CacaoPodSecondary
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineBg
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineBorder
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineText
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import java.util.Locale
 
@@ -45,7 +47,7 @@ import java.util.Locale
 fun SamplingSummaryScreen(
     evaluationId: Long,
     viewModel: SamplingViewModel,
-    onGoToReports: () -> Unit,
+    onGoToReports: (farmId: Long, evaluationDateMillis: Long) -> Unit,
     onDoneToSetup: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -148,8 +150,8 @@ fun SamplingSummaryScreen(
                 if (summary.nMoniliase > 0) {
                     SolarCard(
                         modifier = Modifier.fillMaxWidth(),
-                        containerColor = BoxMoniliaseColor.copy(alpha = 0.12f),
-                        borderColor = BoxMoniliaseColor.copy(alpha = 0.5f)
+                        containerColor = MoniliaseQuarantineBg,
+                        borderColor = MoniliaseQuarantineBorder
                     ) {
                         Row(
                             modifier = Modifier.padding(14.dp),
@@ -158,7 +160,7 @@ fun SamplingSummaryScreen(
                             Icon(
                                 imageVector = Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = BoxMoniliaseColor
+                                tint = MoniliaseQuarantineText
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
@@ -166,7 +168,7 @@ fun SamplingSummaryScreen(
                                     text = "ALERTA QUARENTENÁRIO: Monilíase detectada (${summary.nMoniliase} fruto(s))",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = BoxMoniliaseColor
+                                    color = MoniliaseQuarantineText
                                 )
                                 Text(
                                     text = "Isole a área amostrada e comunique a assistência técnica CEPLAC para vistoria imediata.",
@@ -178,7 +180,7 @@ fun SamplingSummaryScreen(
                 }
 
                 Button(
-                    onClick = onGoToReports,
+                    onClick = { onGoToReports(summary.farmId, summary.dataMillis) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(54.dp)

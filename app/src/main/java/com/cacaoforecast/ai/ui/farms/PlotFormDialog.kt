@@ -68,7 +68,8 @@ fun PlotFormDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(
@@ -89,7 +90,7 @@ fun PlotFormDialog(
                             areaText = it
                             errorMsg = null
                         },
-                        label = { Text("Área (ha) *") },
+                        label = { Text("Área (ha) *", maxLines = 1, softWrap = false) },
                         placeholder = { Text("Ex.: 2,5") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
@@ -101,7 +102,7 @@ fun PlotFormDialog(
                             nptText = it.filter { ch -> ch.isDigit() }
                             errorMsg = null
                         },
-                        label = { Text("NPT (Plantas) *") },
+                        label = { Text("NPT (Pés) *", maxLines = 1, softWrap = false) },
                         placeholder = { Text("Ex.: 2000") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
@@ -154,7 +155,7 @@ fun PlotFormDialog(
                             faText = it
                             errorMsg = null
                         },
-                        label = { Text("FA (Frutos/@) *") },
+                        label = { Text("FA (Frutos/@) *", maxLines = 1, softWrap = false) },
                         placeholder = { Text("Ex.: 250") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
@@ -166,7 +167,7 @@ fun PlotFormDialog(
                             npfText = it.filter { ch -> ch.isDigit() }
                             errorMsg = null
                         },
-                        label = { Text("Meta Fotos (NPF) *") },
+                        label = { Text("Meta (NPF) *", maxLines = 1, softWrap = false) },
                         placeholder = { Text("20") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
@@ -216,7 +217,7 @@ fun PlotFormDialog(
                 }
 
                 Text(
-                    text = "A > 0, NPT > 0, FA > 0 e NPF entre 1 e 500 plantas.",
+                    text = "Campos com * são obrigatórios (NPF de 1 a 500 plantas).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

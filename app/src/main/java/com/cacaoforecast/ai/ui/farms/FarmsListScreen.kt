@@ -15,11 +15,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingActionButton
@@ -82,7 +82,7 @@ fun FarmsListScreen(
                 actions = {
                     IconButton(onClick = { showGlossary = true }) {
                         Icon(
-                            imageVector = Icons.Default.HelpOutline,
+                            imageVector = Icons.AutoMirrored.Filled.HelpOutline,
                             contentDescription = "Guia Rápido"
                         )
                     }
@@ -171,11 +171,11 @@ fun FarmsListScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = if (summary.first == 0) {
-                                        "Nenhuma roça cadastrada • Toque para dividir áreas →"
+                                        "Nenhuma roça cadastrada • Toque para dividir áreas\u00A0→"
                                     } else {
                                         String.format(
                                             ptBr,
-                                            "%d roça(s) • %.2f ha totais • Gerenciar →",
+                                            "%d roça(s) • %.2f\u00A0ha totais • Gerenciar\u00A0→",
                                             summary.first,
                                             summary.second
                                         )

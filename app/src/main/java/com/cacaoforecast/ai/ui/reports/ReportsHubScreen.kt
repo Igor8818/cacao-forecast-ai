@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cacaoforecast.ai.pdf.ReportShareHelper
 import com.cacaoforecast.ai.ui.components.BrandTopAppBar
@@ -60,7 +61,7 @@ fun ReportsHubScreen(
                 subtitle = BrandIdentity.NAME,
                 actions = {
                     IconButton(onClick = { showGlossary = true }) {
-                        Icon(Icons.Default.HelpOutline, contentDescription = "Guia Rápido")
+                        Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = "Guia Rápido")
                     }
                 }
             )
@@ -76,12 +77,24 @@ fun ReportsHubScreen(
                 Tab(
                     selected = selectedSubTab == 0,
                     onClick = { selectedSubTab = 0 },
-                    text = { Text("Consolidado (Tabela & PDF)") }
+                    text = {
+                        Text(
+                            text = "Relatório Parcial",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 )
                 Tab(
                     selected = selectedSubTab == 1,
                     onClick = { selectedSubTab = 1 },
-                    text = { Text("Evolução (Gráfico)") }
+                    text = {
+                        Text(
+                            text = "Relatório Cumulativo",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 )
             }
 
@@ -133,12 +146,31 @@ fun ReportsHubScreen(
                     selectedFarmId = filters.selectedFarmId ?: farms.firstOrNull()?.id,
                     plots = plots,
                     selectedPlotId = filters.cumulativePlotId ?: plots.firstOrNull()?.id,
+                    cumulativePeriodLabel = filters.cumulativePeriodLabel,
                     basis = filters.basis,
                     cumulativeReport = cumulativeReport,
+                    isGeneratingPdf = isGeneratingPdf,
                     onSelectFarm = { viewModel.selectFarm(it) },
                     onSelectPlot = { viewModel.selectCumulativePlot(it) },
+                    onSelectPeriod = { s, e, label -> viewModel.selectCumulativePeriod(s, e, label) },
                     onSelectBasis = { viewModel.selectBasis(it) },
-                    onOpenPlotHistory = onOpenPlotHistory
+                    onOpenPlotHistory = onOpenPlotHistory,
+                    onShareCumulativeWhatsApp = {
+                        viewModel.generateCumulativePdf { file, caption ->
+                            ReportShareHelper.sharePdfToWhatsApp(context, file, caption)
+                        }
+                    },
+                    onShareCumulativeGenericPdf = {
+                        viewModel.generateCumulativePdf { file, caption ->
+                            ReportShareHelper.shareFileGeneric(
+                                context = context,
+                                file = file,
+                                mimeType = "application/pdf",
+                                chooserTitle = "Compartilhar / Salvar Gráfico PDF",
+                                caption = caption
+                            )
+                        }
+                    }
                 )
             }
         }

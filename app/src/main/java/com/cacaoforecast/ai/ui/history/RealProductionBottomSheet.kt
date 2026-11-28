@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -48,6 +50,8 @@ fun RealProductionBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -59,7 +63,7 @@ fun RealProductionBottomSheet(
             Text(
                 text = String.format(
                     Locale("pt", "BR"),
-                    "%s • Estimada Líquida: %.1f @ (Bruta: %.1f @)",
+                    "%s • Estimada Líquida: %.1f\u00A0@ (Bruta: %.1f\u00A0@)",
                     evaluation.snapshotPlotName,
                     evaluation.producaoLiquidaArrobas,
                     evaluation.producaoBrutaArrobas

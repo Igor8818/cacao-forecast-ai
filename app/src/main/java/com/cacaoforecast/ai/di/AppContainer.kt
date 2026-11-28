@@ -2,12 +2,14 @@ package com.cacaoforecast.ai.di
 
 import android.content.Context
 import com.cacaoforecast.ai.data.backup.SqliteBackupManager
+import com.cacaoforecast.ai.data.demo.DemoSeedManager
 import com.cacaoforecast.ai.data.local.CacaoDatabase
 import com.cacaoforecast.ai.data.repository.DefaultCacaoRepository
 import com.cacaoforecast.ai.domain.ml.FruitAnalysisEngine
 import com.cacaoforecast.ai.domain.repository.CacaoRepository
 import com.cacaoforecast.ai.ml.TfliteFruitAnalysisEngine
 import com.cacaoforecast.ai.pdf.CsvReportExporter
+import com.cacaoforecast.ai.pdf.CumulativePdfReportGenerator
 import com.cacaoforecast.ai.pdf.PdfReportGenerator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,8 +44,16 @@ class AppContainer(context: Context) {
         PdfReportGenerator(appContext)
     }
 
+    val cumulativePdfReportGenerator: CumulativePdfReportGenerator by lazy {
+        CumulativePdfReportGenerator(appContext)
+    }
+
     val csvReportExporter: CsvReportExporter by lazy {
         CsvReportExporter(appContext)
+    }
+
+    val demoSeedManager: DemoSeedManager by lazy {
+        DemoSeedManager { currentDatabase() }
     }
 
     val backupManager: SqliteBackupManager by lazy {

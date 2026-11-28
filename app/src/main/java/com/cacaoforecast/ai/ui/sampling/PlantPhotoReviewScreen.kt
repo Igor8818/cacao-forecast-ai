@@ -2,6 +2,7 @@ package com.cacaoforecast.ai.ui.sampling
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -40,6 +41,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -71,8 +73,14 @@ import com.cacaoforecast.ai.ui.theme.BoxHealthyColor
 import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
 import com.cacaoforecast.ai.ui.theme.BoxPodridaoColor
 import com.cacaoforecast.ai.ui.theme.BoxVassouraColor
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineBg
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineText
+import com.cacaoforecast.ai.ui.theme.PodridaoMiniBg
+import com.cacaoforecast.ai.ui.theme.PodridaoMiniText
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalRed
+import com.cacaoforecast.ai.ui.theme.VassouraMiniBg
+import com.cacaoforecast.ai.ui.theme.VassouraMiniText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -207,8 +215,8 @@ fun PlantPhotoReviewScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = "Toque na caixa para ciclar (Sadio → P. Parda → Monil. → Vassoura → Remover) ou ajuste abaixo:",
@@ -269,7 +277,8 @@ fun PlantPhotoReviewScreen(
                     DiseaseMiniCounter(
                         label = "P. Parda",
                         count = uiState.reviewPodridao,
-                        accent = BoxPodridaoColor,
+                        bgColor = PodridaoMiniBg,
+                        fgColor = PodridaoMiniText,
                         onDecrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.PODRIDAO_PARDA, -1) },
                         onIncrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.PODRIDAO_PARDA, 1) },
                         modifier = Modifier.weight(1f)
@@ -277,7 +286,8 @@ fun PlantPhotoReviewScreen(
                     DiseaseMiniCounter(
                         label = "Monilíase",
                         count = uiState.reviewMoniliase,
-                        accent = BoxMoniliaseColor,
+                        bgColor = MoniliaseQuarantineBg,
+                        fgColor = MoniliaseQuarantineText,
                         onDecrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.MONILIASE, -1) },
                         onIncrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.MONILIASE, 1) },
                         modifier = Modifier.weight(1f)
@@ -285,7 +295,8 @@ fun PlantPhotoReviewScreen(
                     DiseaseMiniCounter(
                         label = "Vassoura",
                         count = uiState.reviewVassoura,
-                        accent = BoxVassouraColor,
+                        bgColor = VassouraMiniBg,
+                        fgColor = VassouraMiniText,
                         onDecrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.VASSOURA_BRUXA, -1) },
                         onIncrement = { viewModel.adjustDiseaseTypeCount(FruitHealthCategory.VASSOURA_BRUXA, 1) },
                         modifier = Modifier.weight(1f)
@@ -353,42 +364,67 @@ private fun ReviewLegendItem(color: Color, label: String) {
 private fun DiseaseMiniCounter(
     label: String,
     count: Int,
-    accent: Color,
+    bgColor: Color,
+    fgColor: Color,
     onDecrement: () -> Unit,
     onIncrement: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.10f))
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, fgColor.copy(alpha = 0.30f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp, horizontal = 4.dp),
+                .padding(vertical = 6.dp, horizontal = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = accent,
+                color = fgColor,
                 maxLines = 1
             )
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = onDecrement, modifier = Modifier.size(30.dp)) {
-                    Icon(Icons.Default.Remove, contentDescription = "Diminuir $label", modifier = Modifier.size(16.dp))
+                IconButton(
+                    onClick = onDecrement,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .minimumInteractiveComponentSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Diminuir $label",
+                        tint = fgColor,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
                 Text(
                     text = count.toString(),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                IconButton(onClick = onIncrement, modifier = Modifier.size(30.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = "Aumentar $label", modifier = Modifier.size(16.dp))
+                IconButton(
+                    onClick = onIncrement,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .minimumInteractiveComponentSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Aumentar $label",
+                        tint = fgColor,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }

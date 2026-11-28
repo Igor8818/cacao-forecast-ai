@@ -46,7 +46,8 @@ import com.cacaoforecast.ai.domain.model.EvaluationSummary
 import com.cacaoforecast.ai.ui.components.BrandTopAppBar
 import com.cacaoforecast.ai.ui.components.SeverityPill
 import com.cacaoforecast.ai.ui.components.SolarCard
-import com.cacaoforecast.ai.ui.theme.BoxMoniliaseColor
+import com.cacaoforecast.ai.ui.theme.CacaoSelectedPlotBg
+import com.cacaoforecast.ai.ui.theme.MoniliaseQuarantineText
 import com.cacaoforecast.ai.ui.theme.SeverityControlledGreen
 import com.cacaoforecast.ai.ui.theme.SeverityCriticalRed
 import com.cacaoforecast.ai.ui.theme.SeverityWarningAmber
@@ -108,6 +109,19 @@ fun PlotHistoryScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                item {
+                    SolarCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = CacaoSelectedPlotBg
+                    ) {
+                        Text(
+                            text = "Pós-colheita: quando fechar o peso das amêndoas secas colhidas nesta quadra, toque em \"+ Informar Produção Real (@)\" na avaliação correspondente para alimentar o Relatório Cumulativo.",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
                 itemsIndexed(evaluations, key = { _, item -> item.id }) { index, eval ->
                     val previousEval = evaluations.getOrNull(index + 1)
                     val lossDelta = previousEval?.let { eval.perdasPct - it.perdasPct }
@@ -149,7 +163,7 @@ fun PlotHistoryScreen(
                             Text(
                                 text = String.format(
                                     ptBr,
-                                    "Estimada Líquida: %.1f @ (%.1f @/ha) • Bruta: %.1f @",
+                                    "Estimada Líquida: %.1f\u00A0@ (%.1f\u00A0@/ha) • Bruta: %.1f\u00A0@",
                                     eval.producaoLiquidaArrobas,
                                     eval.produtividadeLiquidaPorHa,
                                     eval.producaoBrutaArrobas
@@ -173,14 +187,14 @@ fun PlotHistoryScreen(
                                     Icon(
                                         imageVector = Icons.Default.Warning,
                                         contentDescription = null,
-                                        tint = BoxMoniliaseColor
+                                        tint = MoniliaseQuarantineText
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "Alerta Quarentenário: ${eval.nMoniliase} fruto(s) com Monilíase",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = BoxMoniliaseColor
+                                        color = MoniliaseQuarantineText
                                     )
                                 }
                             }
@@ -208,7 +222,7 @@ fun PlotHistoryScreen(
                                         Text(
                                             text = String.format(
                                                 ptBr,
-                                                "Estimada vs. Real: %.1f @ vs. %.1f @",
+                                                "Estimada vs. Real: %.1f\u00A0@ vs. %.1f\u00A0@",
                                                 eval.producaoLiquidaArrobas,
                                                 real
                                             ),
@@ -218,7 +232,7 @@ fun PlotHistoryScreen(
                                         Text(
                                             text = String.format(
                                                 ptBr,
-                                                "Diferença: %+.1f @ • Erro relativo: %.1f%%",
+                                                "Diferença: %+.1f\u00A0@ • Erro relativo: %.1f%%",
                                                 diff,
                                                 relErrorPct
                                             ),

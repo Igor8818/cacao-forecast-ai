@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -326,14 +327,18 @@ fun SamplingCameraScreen(
                             }
                         }
                     }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp)
                     ) {
                         OutlinedButton(
                             onClick = { galleryLauncher.launch("image/*") },
                             enabled = !isCapturing,
-                            modifier = Modifier.height(52.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .height(48.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PhotoLibrary,
@@ -341,7 +346,7 @@ fun SamplingCameraScreen(
                                 tint = Color.White
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Galeria", color = Color.White)
+                            Text("Galeria", color = Color.White, maxLines = 1)
                         }
                         Button(
                             onClick = {
@@ -366,7 +371,9 @@ fun SamplingCameraScreen(
                             },
                             enabled = !isCapturing,
                             shape = CircleShape,
-                            modifier = Modifier.size(76.dp)
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(76.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
@@ -390,28 +397,40 @@ fun SamplingCameraScreen(
             onDismissRequest = { showExitDialog = false },
             title = { Text("Sair da Amostragem?") },
             text = {
-                Text("Você já salvou ${draft?.sampledCount ?: 0} de $targetNpf plantas. Deseja manter o rascunho para retomar depois ou cancelar esta sessão?")
+                Text("Você já salvou ${draft?.sampledCount ?: 0} de $targetNpf plantas. Deseja continuar fotografando, salvar o rascunho ou cancelar esta sessão?")
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        showExitDialog = false
-                        viewModel.saveDraftAndExit(onExitToSetup)
-                    }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Salvar rascunho e sair")
+                    Button(
+                        onClick = { showExitDialog = false },
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Text("Continuar fotografando")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            showExitDialog = false
+                            viewModel.saveDraftAndExit(onExitToSetup)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Text("Salvar rascunho e sair")
+                    }
+                    TextButton(
+                        onClick = {
+                            showExitDialog = false
+                            viewModel.discardActiveSession(onExitToSetup)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cancelar amostragem", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showExitDialog = false
-                        viewModel.discardActiveSession(onExitToSetup)
-                    }
-                ) {
-                    Text("Cancelar amostragem", color = MaterialTheme.colorScheme.error)
-                }
-            }
+            dismissButton = {}
         )
     }
 }

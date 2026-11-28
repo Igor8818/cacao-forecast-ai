@@ -13,13 +13,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -51,8 +52,8 @@ import com.cacaoforecast.ai.ui.components.BrandTopAppBar
 import com.cacaoforecast.ai.ui.components.GlossaryHelpSheet
 import com.cacaoforecast.ai.ui.components.SolarCard
 import com.cacaoforecast.ai.ui.theme.CacaoCardBorder
-import com.cacaoforecast.ai.ui.theme.CacaoForestContainer
 import com.cacaoforecast.ai.ui.theme.CacaoForestPrimary
+import com.cacaoforecast.ai.ui.theme.CacaoSelectedPlotBg
 import com.cacaoforecast.ai.ui.theme.CacaoSurfaceCard
 import com.cacaoforecast.ai.ui.theme.SeverityWarningAmber
 import com.cacaoforecast.ai.ui.theme.SeverityWarningBg
@@ -97,6 +98,7 @@ fun SamplingSetupScreen(
 
     var farmDropdownExpanded by remember { mutableStateOf(false) }
     var showGlossary by remember { mutableStateOf(false) }
+    var confirmOverwritePlot by remember { mutableStateOf<Plot?>(null) }
 
     Scaffold(
         topBar = {
@@ -105,7 +107,7 @@ fun SamplingSetupScreen(
                 subtitle = "Selecione a fazenda e a roça",
                 actions = {
                     IconButton(onClick = { showGlossary = true }) {
-                        Icon(Icons.Default.HelpOutline, contentDescription = "Guia Rápido")
+                        Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = "Guia Rápido")
                     }
                 }
             )
@@ -261,7 +263,7 @@ fun SamplingSetupScreen(
                         val isSelected = plot.id == selectedPlot?.id
                         SolarCard(
                             onClick = { viewModel.selectPlot(plot.id) },
-                            containerColor = if (isSelected) CacaoForestContainer.copy(alpha = 0.45f) else CacaoSurfaceCard,
+                            containerColor = if (isSelected) CacaoSelectedPlotBg else CacaoSurfaceCard,
                             borderColor = if (isSelected) CacaoForestPrimary else CacaoCardBorder,
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -286,7 +288,7 @@ fun SamplingSetupScreen(
                                     Text(
                                         text = String.format(
                                             ptBr,
-                                            "%.2f ha • %d pés • FA %.0f • Meta: %d fotos",
+                                            "%.2f\u00A0ha • %,d\u00A0pés • FA\u00A0%.0f • Meta: %d\u00A0fotos",
                                             plot.areaHa,
                                             plot.npt,
                                             plot.fa,
@@ -328,36 +330,84 @@ fun SamplingSetupScreen(
                             )
                         }
 
-                        Button(
-                            onClick = {
-                                viewModel.startNewSession(plot) { evaluationId ->
-                                    onOpenCamera(evaluationId)
-                                }
-                            },
-                            enabled = !uiState.isPreparingEngine,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                        ) {
-                            if (uiState.isPreparingEngine) {
-                                CircularProgressIndicator(
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier
-                                        .height(22.dp)
-                                        .width(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text("Preparando IA CacauLens...")
-                            } else {
+                        val draftForSelectedPlot = uiState.pendingResumeDraft?.takeIf { it.plotId == plot.id }
+                        if (draftForSelectedPlot != null) {
+                            OutlinedButton(
+                                onClick = { confirmOverwritePlot = plot },
+                                enabled = !uiState.isPreparingEngine,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                            ) {
                                 Icon(Icons.Default.CameraAlt, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Iniciar Amostragem (${plot.npf} plantas)")
+                                Text(
+                                    if (uiState.isPreparingEngine) "Preparando IA CacauLens..."
+                                    else "Recomeçar do Zero (${plot.npf} plantas)"
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    viewModel.startNewSession(plot) { evaluationId ->
+                                        onOpenCamera(evaluationId)
+                                    }
+                                },
+                                enabled = !uiState.isPreparingEngine,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                            ) {
+                                if (uiState.isPreparingEngine) {
+                                    CircularProgressIndicator(
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier
+                                            .height(22.dp)
+                                            .width(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("Preparando IA CacauLens...")
+                                } else {
+                                    Icon(Icons.Default.CameraAlt, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Iniciar Amostragem (${plot.npf} plantas)")
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    confirmOverwritePlot?.let { targetPlot ->
+        val draft = uiState.pendingResumeDraft
+        AlertDialog(
+            onDismissRequest = { confirmOverwritePlot = null },
+            title = { Text("Descartar rascunho em andamento?") },
+            text = {
+                Text(
+                    "A roça \"${targetPlot.nome}\" já possui ${draft?.sampledCount ?: 0} de ${draft?.snapshotNpf ?: targetPlot.npf} plantas salvas. Iniciar uma nova amostragem apagará as fotos atuais desta sessão."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmOverwritePlot = null
+                        viewModel.startNewSession(targetPlot) { evaluationId ->
+                            onOpenCamera(evaluationId)
+                        }
+                    }
+                ) {
+                    Text("Apagar e Iniciar Nova")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmOverwritePlot = null }) {
+                    Text("Voltar")
+                }
+            }
+        )
     }
 
     if (showGlossary) {
