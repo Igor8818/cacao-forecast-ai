@@ -157,7 +157,7 @@ fun CumulativePlaceholderContent(
                 ExposedDropdownMenuBox(
                     expanded = plotExpanded,
                     onExpandedChange = { plotExpanded = !plotExpanded },
-                    modifier = Modifier.weight(1.2f)
+                    modifier = Modifier.weight(1.05f)
                 ) {
                     OutlinedTextField(
                         value = activePlot.nome,
@@ -166,6 +166,7 @@ fun CumulativePlaceholderContent(
                         label = { Text("Roça / Quadra Específica", maxLines = 1, softWrap = false) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(plotExpanded) },
                         singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier
                             .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             .fillMaxWidth()
@@ -188,12 +189,13 @@ fun CumulativePlaceholderContent(
 
                 Box(modifier = Modifier.weight(1f)) {
                     OutlinedTextField(
-                        value = cumulativePeriodLabel,
+                        value = if (cumulativePeriodLabel == "Todo o Histórico") "Todo Período" else cumulativePeriodLabel,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Colheita", maxLines = 1, softWrap = false) },
                         leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                         singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Box(
@@ -624,18 +626,26 @@ private fun EstimatedVsRealChart(
             drawCircle(color = SeverityWarningAmber, radius = 9f, center = Offset(x, y))
         }
 
-        // Rótulos de data no eixo X (evita sobreposição quando há muitos pontos)
-        val labelStep = ((count - 1) / 4).coerceAtLeast(1)
+        // Rótulos de data no eixo X com espaçamento mínimo garantido para evitar colisões
+        val minSpacingPx = 130f
+        val maxLabelX = (leftPad + chartW - 108f).coerceAtLeast(leftPad)
+        val lastPointX = if (count > 0) (xForIndex(count - 1) - 42f).coerceIn(leftPad, maxLabelX) else leftPad
+        var lastDrawnX = -Float.MAX_VALUE
         points.forEachIndexed { idx, pt ->
-            if (idx == 0 || idx == count - 1 || idx % labelStep == 0) {
-                val x = xForIndex(idx)
+            val rawDrawX = (xForIndex(idx) - 42f).coerceIn(leftPad, maxLabelX)
+            val isFirst = idx == 0
+            val isLast = idx == count - 1
+            val fitsBetween = (rawDrawX - lastDrawnX) >= minSpacingPx && (lastPointX - rawDrawX) >= minSpacingPx
+            val fitsLast = isLast && (count == 1 || (rawDrawX - lastDrawnX) >= 110f)
+            if (isFirst || fitsBetween || fitsLast) {
                 val label = dayMonthFmt.format(Date(pt.dataMillis))
                 drawContext.canvas.nativeCanvas.drawText(
                     label,
-                    (x - 42f).coerceIn(leftPad, (leftPad + chartW - 108f).coerceAtLeast(leftPad)),
+                    rawDrawX,
                     topPad + chartH + 34f,
                     axisTextPaint
                 )
+                lastDrawnX = rawDrawX
             }
         }
     }

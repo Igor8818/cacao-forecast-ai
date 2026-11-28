@@ -79,7 +79,7 @@ fun ReportsHubScreen(
                     onClick = { selectedSubTab = 0 },
                     text = {
                         Text(
-                            text = "Relatório Parcial",
+                            text = "Parcial",
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -90,7 +90,18 @@ fun ReportsHubScreen(
                     onClick = { selectedSubTab = 1 },
                     text = {
                         Text(
-                            text = "Relatório Cumulativo",
+                            text = "Cumulativo",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedSubTab == 2,
+                    onClick = { selectedSubTab = 2 },
+                    text = {
+                        Text(
+                            text = "Painel",
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -98,8 +109,8 @@ fun ReportsHubScreen(
                 )
             }
 
-            if (selectedSubTab == 0) {
-                TabularReportContent(
+            when (selectedSubTab) {
+                0 -> TabularReportContent(
                     farms = farms,
                     plots = plots,
                     filters = filters,
@@ -140,8 +151,8 @@ fun ReportsHubScreen(
                     },
                     onNavigateToFarms = onNavigateToFarms
                 )
-            } else {
-                CumulativePlaceholderContent(
+
+                1 -> CumulativePlaceholderContent(
                     farms = farms,
                     selectedFarmId = filters.selectedFarmId ?: farms.firstOrNull()?.id,
                     plots = plots,
@@ -171,6 +182,17 @@ fun ReportsHubScreen(
                             )
                         }
                     }
+                )
+
+                else -> HarvestDashboardContent(
+                    farms = farms,
+                    filters = filters,
+                    report = report,
+                    onSelectFarm = { viewModel.selectFarm(it) },
+                    onSelectPeriod = { s, e, l -> viewModel.selectPeriod(s, e, l) },
+                    onSelectBasis = { viewModel.selectBasis(it) },
+                    onOpenPlotHistory = onOpenPlotHistory,
+                    onNavigateToFarms = onNavigateToFarms
                 )
             }
         }

@@ -80,13 +80,46 @@ class CacaoColorHeuristicsAndExifTest {
             y2Tensor = 90f
         )
         assertEquals(2, keptHealthy)
+
+        // 4. Sadio incerto (< 0.78) competindo com Podridao Parda (0 >= 0.16) + cor marrom/ferrugem -> Podridao Parda (0)
+        val podridaoPixels = IntArray(w * h) { Color.rgb(138, 70, 40) }
+        val promotedPodridao = CacaoColorHeuristics.refinarClasseDoencaPorMorfologiaCor(
+            classIdx = 2,
+            probBest = 0.36f,
+            probClass0 = 0.22f,
+            pixels = podridaoPixels,
+            width = w,
+            height = h,
+            x1Tensor = 10f,
+            y1Tensor = 10f,
+            x2Tensor = 90f,
+            y2Tensor = 90f
+        )
+        assertEquals(0, promotedPodridao)
+
+        // 5. Podridao Parda marrom-escura com probClass3 == 0 nao deve virar Vassoura
+        val podridaoEscuraPixels = IntArray(w * h) { Color.rgb(90, 48, 28) }
+        val keptPodridao = CacaoColorHeuristics.refinarClasseDoencaPorMorfologiaCor(
+            classIdx = 0,
+            probBest = 0.41f,
+            probClass0 = 0.41f,
+            pixels = podridaoEscuraPixels,
+            width = w,
+            height = h,
+            x1Tensor = 10f,
+            y1Tensor = 10f,
+            x2Tensor = 90f,
+            y2Tensor = 90f,
+            probClass3 = 0f
+        )
+        assertEquals(0, keptPodridao)
     }
 
     @Test
     fun `classificarRecorteDoencaCacau classifica Moniliase Vassoura Podridao e Sadio por recorte`() {
         val rect = RectF(0f, 0f, 40f, 40f)
 
-        // Moniliase: >= 26% esporos brancos + >= 12% escuro/marrom
+        // Moniliase: >= 24% esporos brancos + >= 12% escuro/marrom
         val bmpMoniliase = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888)
         for (y in 0 until 40) {
             for (x in 0 until 40) {
@@ -96,19 +129,34 @@ class CacaoColorHeuristicsAndExifTest {
         assertEquals(FruitHealthCategory.MONILIASE, CacaoColorHeuristics.classificarRecorteDoencaCacau(bmpMoniliase, rect))
         bmpMoniliase.recycle()
 
-        // Vassoura de Bruxa: predominantemente escuro necrotico (>= 55%)
+        // Vassoura de Bruxa: predominantemente escuro necrotico (>= 52%)
         val bmpVassoura = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.rgb(45, 42, 40))
         }
         assertEquals(FruitHealthCategory.VASSOURA_BRUXA, CacaoColorHeuristics.classificarRecorteDoencaCacau(bmpVassoura, rect))
         bmpVassoura.recycle()
 
-        // Podridao Parda: marrom avermelhado (r > g*1.18, cmax 0.25..0.70, rb > 0.20)
+        // Podridao Parda: marrom avermelhado (r > g*1.15, cmax 0.20..0.70)
         val bmpPodridao = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.rgb(145, 75, 45))
         }
         assertEquals(FruitHealthCategory.PODRIDAO_PARDA, CacaoColorHeuristics.classificarRecorteDoencaCacau(bmpPodridao, rect))
         bmpPodridao.recycle()
+
+        // Podridao Parda mista: ~38% marrom + ~38% escuro necrotico + 24% verde residual (sem falso sadio)
+        val bmpPodridaoMista = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888)
+        for (y in 0 until 40) {
+            for (x in 0 until 40) {
+                val c = when ((x + y) % 8) {
+                    0, 1, 2 -> Color.rgb(140, 72, 42) // marrom lesionado
+                    3, 4, 5 -> Color.rgb(45, 35, 30)  // necrose escura
+                    else -> Color.rgb(110, 130, 50)   // casca residual
+                }
+                bmpPodridaoMista.setPixel(x, y, c)
+            }
+        }
+        assertEquals(FruitHealthCategory.PODRIDAO_PARDA, CacaoColorHeuristics.classificarRecorteDoencaCacau(bmpPodridaoMista, rect))
+        bmpPodridaoMista.recycle()
 
         // Sadio: verde/amarelo vibrante
         val bmpSadio = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888).apply {

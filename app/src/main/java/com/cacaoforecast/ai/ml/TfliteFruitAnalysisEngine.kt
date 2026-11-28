@@ -5,8 +5,11 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
+import android.util.Log
+import com.cacaoforecast.ai.domain.ml.DetectedFruitBox
 import com.cacaoforecast.ai.domain.ml.FruitAnalysisEngine
 import com.cacaoforecast.ai.domain.ml.FruitHealthCategory
 import com.cacaoforecast.ai.domain.ml.PlantPhotoAnalysisResult
@@ -163,12 +166,17 @@ class TfliteFruitAnalysisEngine(
                 val diseaseShape = diseaseInterpreter!!.getOutputTensor(0).shape()
                 val diseaseTransposed = diseaseShape[1] < diseaseShape[2]
                 val diseaseClasses = (minOf(diseaseShape[1], diseaseShape[2]) - 4).coerceAtLeast(1)
+                val rawMaxDiseaseProbs = computeMaxDiseaseProbs(
+                    matrix = outDisease[0],
+                    numClasses = diseaseClasses,
+                    transposed = diseaseTransposed
+                )
                 val decodedDisease = YoloTfliteInterpreter.decodeAndNms(
                     outputMatrix = outDisease[0],
                     numClasses = diseaseClasses,
                     transposed = diseaseTransposed,
                     geometry = geometry,
-                    scoreThreshold = diseaseThreshold.coerceAtMost(0.28f),
+                    scoreThreshold = diseaseThreshold.coerceAtMost(0.16f),
                     maxResults = maxResults,
                     letterboxPixels = pixels,
                     applyDiseaseColorRefinement = true
@@ -195,7 +203,7 @@ class TfliteFruitAnalysisEngine(
                     )
                 }
 
-                val fusedBoxes = DualModelFusionProcessor.fuse(
+                val initialFused = DualModelFusionProcessor.fuse(
                     countingBoxes = countingInputs,
                     diseaseBoxes = diseaseInputs,
                     iouMinimo = 0.20f,
@@ -214,12 +222,46 @@ class TfliteFruitAnalysisEngine(
                     }
                 )
 
+                val (fusedBoxes, mosaicPromoted) = refineHealthyBoxesWithDiseaseMosaic(
+                    bitmap = bitmap,
+                    boxes = initialFused,
+                    diseaseInterpreter = diseaseInterpreter!!,
+                    outDisease = outDisease,
+                    diseaseClasses = diseaseClasses,
+                    diseaseTransposed = diseaseTransposed,
+                    scoreThreshold = diseaseThreshold.coerceAtMost(0.16f)
+                )
+
                 val countHealthy = fusedBoxes.count { !it.category.isDiseased }
                 val countPodridao = fusedBoxes.count { it.category == FruitHealthCategory.PODRIDAO_PARDA }
                 val countMoniliase = fusedBoxes.count { it.category == FruitHealthCategory.MONILIASE }
                 val countVassoura = fusedBoxes.count { it.category == FruitHealthCategory.VASSOURA_BRUXA }
                 val countDiseased = countPodridao + countMoniliase + countVassoura
                 val elapsed = (System.currentTimeMillis() - tStart).coerceAtLeast(1L)
+
+                runCatching {
+                    Log.i(
+                        "CacaoML",
+                        String.format(
+                            java.util.Locale.US,
+                            "img=%dx%d countDet=%d globalDisDet=%d rawMax=[PP=%.2f, MO=%.2f, SA=%.2f, VB=%.2f] mosaicPromoted=%d final=[SA=%d, PP=%d, MO=%d, VB=%d] ms=%d",
+                            imgW,
+                            imgH,
+                            decodedCount.size,
+                            decodedDisease.size,
+                            rawMaxDiseaseProbs[0],
+                            rawMaxDiseaseProbs[1],
+                            rawMaxDiseaseProbs[2],
+                            rawMaxDiseaseProbs[3],
+                            mosaicPromoted,
+                            countHealthy,
+                            countPodridao,
+                            countMoniliase,
+                            countVassoura,
+                            elapsed
+                        )
+                    )
+                }
 
                 PlantPhotoAnalysisResult(
                     boxes = fusedBoxes,
@@ -238,6 +280,177 @@ class TfliteFruitAnalysisEngine(
                 }
             }
         }
+    }
+
+    /**
+     * 2º estágio em alta resolução (Mosaico 2×2): reavalia até 16 frutos ainda classificados como
+     * `SADIO` ampliando cada recorte para quadrantes de 320×320 px sobre o `DirectByteBuffer`
+     * compartilhado (zero alocação extra de memória), garantindo sensibilidade a lesões pequenas.
+     */
+    private fun refineHealthyBoxesWithDiseaseMosaic(
+        bitmap: Bitmap,
+        boxes: List<DetectedFruitBox>,
+        diseaseInterpreter: Interpreter,
+        outDisease: Array<Array<FloatArray>>,
+        diseaseClasses: Int,
+        diseaseTransposed: Boolean,
+        scoreThreshold: Float
+    ): Pair<List<DetectedFruitBox>, Int> {
+        val candidateIndices = boxes.indices
+            .filter { idx -> boxes[idx].category == FruitHealthCategory.SADIO }
+            .sortedByDescending { idx ->
+                val b = boxes[idx]
+                (b.normRight - b.normLeft) * (b.normBottom - b.normTop)
+            }
+            .take(MAX_MOSAIC_CROPS)
+
+        if (candidateIndices.isEmpty()) return boxes to 0
+
+        val imgW = bitmap.width
+        val imgH = bitmap.height
+        val inputSize = YoloTfliteInterpreter.INPUT_SIZE
+        val tileSize = inputSize / 2f
+        val lbBitmap = letterboxBitmap ?: return boxes to 0
+        val pixels = letterboxPixels ?: return boxes to 0
+        val fArr = sharedFloatArray ?: return boxes to 0
+        val floatView = sharedFloatView ?: return boxes to 0
+        val inputBuf = sharedInputBuffer ?: return boxes to 0
+        val canvasGeometry = LetterboxGeometry.compute(inputSize, inputSize, inputSize)
+        val canvas = Canvas(lbBitmap)
+        val mutable = boxes.toMutableList()
+        var promoted = 0
+
+        val srcRect = Rect()
+        val destRect = RectF()
+        data class SlotPlacement(
+            val boxIndex: Int,
+            val qMinX: Float,
+            val qMinY: Float,
+            val qMaxX: Float,
+            val qMaxY: Float,
+            val innerLeftNorm: Float,
+            val innerTopNorm: Float,
+            val innerRightNorm: Float,
+            val innerBottomNorm: Float
+        )
+
+        for (batch in candidateIndices.chunked(4)) {
+            canvas.drawColor(Color.rgb(114, 114, 114))
+            val placements = ArrayList<SlotPlacement>(batch.size)
+
+            batch.forEachIndexed { slot, boxIdx ->
+                val b = mutable[boxIdx]
+                val leftPx = b.normLeft * imgW
+                val topPx = b.normTop * imgH
+                val rightPx = b.normRight * imgW
+                val bottomPx = b.normBottom * imgH
+                val boxW = (rightPx - leftPx).coerceAtLeast(4f)
+                val boxH = (bottomPx - topPx).coerceAtLeast(4f)
+                val padSrcX = boxW * 0.25f
+                val padSrcY = boxH * 0.25f
+
+                val sLeft = kotlin.math.floor(leftPx - padSrcX).toInt().coerceIn(0, (imgW - 2).coerceAtLeast(0))
+                val sTop = kotlin.math.floor(topPx - padSrcY).toInt().coerceIn(0, (imgH - 2).coerceAtLeast(0))
+                val sRight = kotlin.math.ceil(rightPx + padSrcX).toInt().coerceIn((sLeft + 2).coerceAtMost(imgW), imgW)
+                val sBottom = kotlin.math.ceil(bottomPx + padSrcY).toInt().coerceIn((sTop + 2).coerceAtMost(imgH), imgH)
+                srcRect.set(sLeft, sTop, sRight, sBottom)
+
+                val cropW = (sRight - sLeft).coerceAtLeast(1).toFloat()
+                val cropH = (sBottom - sTop).coerceAtLeast(1).toFloat()
+                val tileScale = minOf(tileSize / cropW, tileSize / cropH)
+                val drawW = cropW * tileScale
+                val drawH = cropH * tileScale
+                val qx = (slot % 2) * tileSize
+                val qy = (slot / 2) * tileSize
+                val tilePadX = (tileSize - drawW) / 2f
+                val tilePadY = (tileSize - drawH) / 2f
+
+                destRect.set(qx + tilePadX, qy + tilePadY, qx + tilePadX + drawW, qy + tilePadY + drawH)
+                canvas.drawBitmap(bitmap, srcRect, destRect, letterboxPaint)
+
+                placements.add(
+                    SlotPlacement(
+                        boxIndex = boxIdx,
+                        qMinX = qx / inputSize,
+                        qMinY = qy / inputSize,
+                        qMaxX = (qx + tileSize) / inputSize,
+                        qMaxY = (qy + tileSize) / inputSize,
+                        innerLeftNorm = (qx + tilePadX + (leftPx - sLeft) * tileScale) / inputSize,
+                        innerTopNorm = (qy + tilePadY + (topPx - sTop) * tileScale) / inputSize,
+                        innerRightNorm = (qx + tilePadX + (rightPx - sLeft) * tileScale) / inputSize,
+                        innerBottomNorm = (qy + tilePadY + (bottomPx - sTop) * tileScale) / inputSize
+                    )
+                )
+            }
+
+            lbBitmap.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
+            var outIdx = 0
+            for (px in pixels) {
+                fArr[outIdx++] = FLOAT_NORM_LUT[(px shr 16) and 0xFF]
+                fArr[outIdx++] = FLOAT_NORM_LUT[(px shr 8) and 0xFF]
+                fArr[outIdx++] = FLOAT_NORM_LUT[px and 0xFF]
+            }
+            floatView.rewind()
+            floatView.put(fArr)
+            inputBuf.rewind()
+            diseaseInterpreter.run(inputBuf, outDisease)
+
+            val mosaicDetections = YoloTfliteInterpreter.decodeAndNms(
+                outputMatrix = outDisease[0],
+                numClasses = diseaseClasses,
+                transposed = diseaseTransposed,
+                geometry = canvasGeometry,
+                scoreThreshold = scoreThreshold,
+                maxResults = 32,
+                letterboxPixels = pixels,
+                applyDiseaseColorRefinement = true
+            )
+
+            for (slot in placements) {
+                val bestDisease = mosaicDetections
+                    .asSequence()
+                    .filter { det -> det.category.isDiseased }
+                    .filter { det ->
+                        val cx = (det.normLeft + det.normRight) * 0.5f
+                        val cy = (det.normTop + det.normBottom) * 0.5f
+                        cx in slot.qMinX..slot.qMaxX && cy in slot.qMinY..slot.qMaxY
+                    }
+                    .filter { det ->
+                        DualModelFusionProcessor.iouNorm(
+                            det.normLeft, det.normTop, det.normRight, det.normBottom,
+                            slot.innerLeftNorm, slot.innerTopNorm, slot.innerRightNorm, slot.innerBottomNorm
+                        ) >= 0.12f
+                    }
+                    .maxByOrNull { it.confidence }
+
+                if (bestDisease != null) {
+                    val orig = mutable[slot.boxIndex]
+                    mutable[slot.boxIndex] = orig.copy(
+                        category = bestDisease.category,
+                        confidence = maxOf(orig.confidence, bestDisease.confidence)
+                    )
+                    promoted++
+                }
+            }
+        }
+        return mutable to promoted
+    }
+
+    private fun computeMaxDiseaseProbs(
+        matrix: Array<FloatArray>,
+        numClasses: Int,
+        transposed: Boolean
+    ): FloatArray {
+        val maxes = FloatArray(4)
+        val numAnchors = if (transposed) matrix.firstOrNull()?.size ?: 0 else matrix.size
+        val classes = numClasses.coerceAtMost(4)
+        for (a in 0 until numAnchors) {
+            for (c in 0 until classes) {
+                val v = if (transposed) matrix[4 + c][a] else matrix[a][4 + c]
+                if (v > maxes[c]) maxes[c] = v
+            }
+        }
+        return maxes
     }
 
     override fun releaseSession() {
@@ -292,6 +505,7 @@ class TfliteFruitAnalysisEngine(
     companion object {
         const val ASSET_COUNT_MODEL = "detector.tflite"
         const val ASSET_DISEASE_MODEL = "detector_doenca.tflite"
+        private const val MAX_MOSAIC_CROPS = 16
         private val FLOAT_NORM_LUT = FloatArray(256) { it / 255f }
     }
 }

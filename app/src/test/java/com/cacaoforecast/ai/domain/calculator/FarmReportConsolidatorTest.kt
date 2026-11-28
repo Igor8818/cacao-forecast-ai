@@ -240,6 +240,11 @@ class FarmReportConsolidatorTest {
         assertEquals(3, report.footer.totalMoniliaseFruits)
         assertEquals(listOf("Roça Baixa"), report.footer.moniliaseAlertPlotNames)
         assertEquals(3, report.rows.first { it.plotId == 1L }.nMoniliase)
+        assertEquals(185, report.footer.totalHealthyFruits)
+        assertEquals(10, report.footer.totalPodridaoPardaFruits)
+        assertEquals(0, report.footer.totalVassouraBruxaFruits)
+        assertEquals(200.0, report.footer.totalBrutaArrobas, 1e-6)
+        assertEquals(185.0, report.footer.totalLiquidaArrobas, 1e-6)
     }
 
     private fun eval(

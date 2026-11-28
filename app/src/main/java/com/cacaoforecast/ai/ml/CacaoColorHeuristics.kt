@@ -102,13 +102,24 @@ object CacaoColorHeuristics {
         val isRustMummified = rustRatio >= 0.26f && darkMatteRatio >= 0.24f && valMean < 0.62f
 
         return when (classIdx) {
-            0 -> if (isColdGrayDry || isDarkBrownDry || isPredominantlyNecroticMatte || isRustMummified) 3 else 0
+            0 -> if (isColdGrayDry || (probClass3 >= 0.08f && (isDarkBrownDry || isPredominantlyNecroticMatte || isRustMummified))) 3 else 0
             1 -> if ((isColdGrayDry || isPredominantlyNecroticMatte) && whiteSporeRatio < 0.12f && probBest < 0.65f) 3 else 1
             else -> {
-                if ((rbDiff < 0.10f && satMean < 0.20f && valMean < 0.58f) ||
-                    (darkMatteRatio >= 0.55f && valMean < 0.52f && rbDiff < 0.18f) ||
-                    (isRustMummified && probClass3 >= 0.14f)
-                ) 3 else classIdx
+                val maxDiseaseProb = maxOf(probClass0, probClass1, probClass3)
+                val maxDiseaseIdx = when {
+                    probClass1 >= probClass0 && probClass1 >= probClass3 -> 1
+                    probClass3 >= probClass0 && probClass3 >= probClass1 -> 3
+                    else -> 0
+                }
+                when {
+                    probClass1 >= 0.16f && whiteSporeRatio >= 0.20f && (darkMatteRatio >= 0.10f || rustRatio >= 0.10f) -> 1
+                    (rbDiff < 0.10f && satMean < 0.20f && valMean < 0.58f) ||
+                        (darkMatteRatio >= 0.55f && valMean < 0.52f && rbDiff < 0.18f) ||
+                        (isRustMummified && probClass3 >= 0.14f) -> 3
+                    probClass0 >= 0.16f && (rustRatio >= 0.20f || (darkMatteRatio >= 0.30f && rbDiff >= 0.12f)) -> 0
+                    maxDiseaseProb >= 0.24f && maxDiseaseProb >= probBest * 0.65f -> maxDiseaseIdx
+                    else -> classIdx
+                }
             }
         }
     }
@@ -140,6 +151,7 @@ object CacaoColorHeuristics {
         var darkCount = 0
         var whiteSporeCount = 0
         var brownCount = 0
+        var healthyGreenYellowCount = 0
         var count = 0
 
         var y = startY
@@ -157,7 +169,8 @@ object CacaoColorHeuristics {
 
                 if (cmax < 0.36f || (cmax < 0.50f && sat < 0.28f && rb < 0.16f)) darkCount++
                 if (cmax > 0.74f && sat < 0.20f) whiteSporeCount++
-                if (r > g * 1.18f && cmax in 0.25f..0.70f && rb > 0.20f) brownCount++
+                if (r > g * 1.15f && cmax in 0.20f..0.70f && rb >= 0.14f && sat >= 0.26f) brownCount++
+                if (g >= r * 0.88f && cmax >= 0.32f && (g - b) >= 0.12f) healthyGreenYellowCount++
                 count++
                 x += stepX
             }
@@ -167,11 +180,14 @@ object CacaoColorHeuristics {
         val darkRatio = darkCount.toFloat() / count
         val sporeRatio = whiteSporeCount.toFloat() / count
         val brownRatio = brownCount.toFloat() / count
+        val healthyRatio = healthyGreenYellowCount.toFloat() / count
 
         return when {
-            sporeRatio >= 0.26f && (darkRatio >= 0.12f || brownRatio >= 0.12f) -> FruitHealthCategory.MONILIASE
+            sporeRatio >= 0.24f && (darkRatio >= 0.12f || brownRatio >= 0.12f) -> FruitHealthCategory.MONILIASE
+            darkRatio >= 0.52f && brownRatio < 0.25f -> FruitHealthCategory.VASSOURA_BRUXA
+            (brownRatio >= 0.42f && darkRatio < 0.35f) ||
+                (brownRatio >= 0.22f && (brownRatio + darkRatio) >= 0.55f && healthyRatio < 0.35f) -> FruitHealthCategory.PODRIDAO_PARDA
             darkRatio >= 0.55f -> FruitHealthCategory.VASSOURA_BRUXA
-            brownRatio >= 0.55f && darkRatio < 0.28f -> FruitHealthCategory.PODRIDAO_PARDA
             else -> FruitHealthCategory.SADIO
         }
     }

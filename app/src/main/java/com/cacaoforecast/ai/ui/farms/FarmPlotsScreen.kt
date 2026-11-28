@@ -245,7 +245,7 @@ fun FarmPlotsScreen(
                                 ) {
                                     Icon(Icons.Default.History, contentDescription = null)
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Histórico / Real", maxLines = 1)
+                                    Text("Histórico", maxLines = 1)
                                 }
                             }
                         }

@@ -26,7 +26,11 @@ data class PlotReportRowUiModel(
     val perdasPct: Double,
     val severity: DiseaseSeverity,
     val dominantDisease: DominantDisease,
-    val nMoniliase: Int = 0
+    val nMoniliase: Int = 0,
+    val nfs: Int = 0,
+    val nfd: Int = 0,
+    val nPodridaoParda: Int = 0,
+    val nVassouraBruxa: Int = 0
 )
 
 data class FarmConsolidatedFooterUiModel(
@@ -41,7 +45,12 @@ data class FarmConsolidatedFooterUiModel(
     val perdasPonderadasPct: Double,
     val severity: DiseaseSeverity,
     val totalMoniliaseFruits: Int = 0,
-    val moniliaseAlertPlotNames: List<String> = emptyList()
+    val moniliaseAlertPlotNames: List<String> = emptyList(),
+    val totalBrutaArrobas: Double = 0.0,
+    val totalLiquidaArrobas: Double = 0.0,
+    val totalHealthyFruits: Int = 0,
+    val totalPodridaoPardaFruits: Int = 0,
+    val totalVassouraBruxaFruits: Int = 0
 )
 
 data class FarmReportUiModel(
